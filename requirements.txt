@@ -1,0 +1,9 @@
+Flask
+pandas
+scikit-learn
+openpyxl
+Werkzeug
+opencv-python
+pyzbar
+mysql-connector-python
+gunicorn

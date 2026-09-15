@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Scanner — FraudLens</title>
+<link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css', v='20260904-tool-ui') }}" rel="stylesheet">
+</head>
+<body>
+<script>document.documentElement.setAttribute('data-auth-check','1');</script>
+
+<nav class="navbar navbar-expand-lg fl-navbar">
+  <div class="container page-shell px-0">
+    <a class="fl-brand navbar-brand" href="{{ url_for('dashboard') }}">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="FraudLens Logo" class="fl-logo-img">
+      <div class="fl-logo-fallback">FL</div>
+      <div class="fl-brand-text">
+        <span class="fl-brand-name">FraudLens</span>
+        <span class="fl-brand-sub">Scam Detection</span>
+      </div>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMain">
+      <ul class="navbar-nav mx-auto gap-lg-1 mt-3 mt-lg-0">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('sms_detector') }}">SMS Detector</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('link_checker') }}">Link Checker</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{{ url_for('qr_scanner') }}">QR Scanner</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('safety_hub') }}">Cyber Safety Hub</a></li>
+      </ul>
+      <div class="d-flex align-items-center gap-3 mt-3 mt-lg-0">
+        <button type="button" class="fl-user-chip" id="userChip"></button>
+        <button class="btn btn-outline-soft btn-sm" data-logout>
+          <i class="bi bi-box-arrow-right me-1"></i>Logout
+        </button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="page-shell">
+  <div class="tool-single-col">
+
+    <div class="tool-header fade-in text-center">
+      <div class="tool-icon-badge mx-auto"><i class="bi bi-qr-code-scan"></i></div>
+      <span class="section-label">QR Scanner</span>
+      <h1 style="font-size:1.9rem;">QR Code Scanner &amp; Safety Check</h1>
+      <p class="text-muted-soft mx-auto" style="max-width:560px;">Point your camera at a QR code and FraudLens will reveal — and risk-check — where it actually leads.</p>
+
+      <div class="tool-meta-row justify-content-center">
+        <span class="tool-capability-chip"><i class="bi bi-camera"></i>Live camera scan</span>
+        <span class="tool-capability-chip"><i class="bi bi-broadcast-pin"></i>Live camera decoding</span>
+        <span class="tool-capability-chip"><i class="bi bi-shield-check"></i>Destination risk check</span>
+      </div>
+    </div>
+
+    <div class="fl-card tool-card p-4">
+
+      <div class="qr-preview-frame qr-camera-frame" id="qrPreviewFrame">
+        <span class="corner tl"></span>
+        <span class="corner tr"></span>
+        <span class="corner bl"></span>
+        <span class="corner br"></span>
+        <span class="scan-line"></span>
+        <div class="qr-camera-placeholder"><i class="bi bi-camera-video" style="font-size:2.5rem;"></i><span>Camera preview appears here</span></div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-primary btn-lg-touch" id="startQrCameraBtn" type="button"><i class="bi bi-camera me-1"></i>Start Camera</button>
+        <button class="btn btn-outline-soft" id="stopQrCameraBtn" type="button" hidden><i class="bi bi-stop-circle me-1"></i>Stop Camera</button>
+        <button class="btn btn-outline-soft" id="clearQrScanBtn" type="button" hidden><i class="bi bi-arrow-counterclockwise me-1"></i>Clear Scan</button>
+      </div>
+
+      <div class="qr-scan-status" id="qrScanStatus"><i class="bi bi-info-circle"></i><span>Camera is off. Start scanning when you are ready.</span></div>
+
+      <div class="loading-state" id="qrLoading">
+        <span class="spinner-ring"></span> Reading QR code and checking destination…
+      </div>
+    </div>
+
+    <div class="result-card hidden-result" id="qrResult"></div>
+  </div>
+
+  <footer class="fl-footer text-center">
+    FraudLens - AI Powered Scam Detection System 2026
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="{{ url_for('static', filename='js/script.js', v='20260904-qr-camera-2') }}"></script>
+</body>
+</html>

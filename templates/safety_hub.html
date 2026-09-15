@@ -1,0 +1,952 @@
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyber Safety Hub — FraudLens</title>
+<link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+<script>document.documentElement.setAttribute('data-auth-check','1');</script>
+
+<nav class="navbar navbar-expand-lg fl-navbar">
+  <div class="container page-shell px-0">
+    <a class="fl-brand navbar-brand" href="{{ url_for('dashboard') }}">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="FraudLens Logo" class="fl-logo-img">
+      <div class="fl-logo-fallback">FL</div>
+      <div class="fl-brand-text">
+        <span class="fl-brand-name">FraudLens</span>
+        <span class="fl-brand-sub">Scam Detection</span>
+      </div>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMain">
+      <ul class="navbar-nav mx-auto gap-lg-1 mt-3 mt-lg-0">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('sms_detector') }}">SMS Detector</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('link_checker') }}">Link Checker</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('qr_scanner') }}">QR Scanner</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{{ url_for('safety_hub') }}">Cyber Safety Hub</a></li>
+      </ul>
+      <div class="d-flex align-items-center gap-3 mt-3 mt-lg-0">
+        <button type="button" class="fl-user-chip" id="userChip"></button>
+        <button class="btn btn-outline-soft btn-sm" data-logout>
+          <i class="bi bi-box-arrow-right me-1"></i>Logout
+        </button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="page-shell safety-hub-page" id="safetyHubPage">
+  <section class="safety-hero">
+    <div class="safety-hero-bg">
+      <span class="hero-scan-ring ring-one"></span>
+      <span class="hero-scan-ring ring-two"></span>
+      <span class="hero-scan-ring ring-three"></span>
+    </div>
+    <div class="safety-hero-content">
+      <div class="safety-hero-left">
+        <div class="section-label">Cyber Security Awareness &amp; Safety Hub</div>
+        <h1>Stay Safe. Stay Smart. Stay Protected.</h1>
+        <p class="hero-subtitle">Learn how to protect your identity, accounts, devices, money and personal information from modern cyber threats.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-lg-touch" href="#threats"><i class="bi bi-shield-check me-2"></i>Know the Threats</a>
+          <a class="btn btn-outline-soft btn-lg-touch" href="#quick-check"><i class="bi bi-list-check me-2"></i>10-Second Check</a>
+        </div>
+        <div class="hero-status">
+          <span class="status-badge safe"><i class="bi bi-shield-check"></i>Security Status: Protected</span>
+          <span class="mini-status"><i class="bi bi-lock-fill"></i>FraudLens Awareness Mode</span>
+        </div>
+        <div class="hero-metadata">
+          <span><i class="bi bi-shield-lock"></i>Identity</span>
+          <span><i class="bi bi-wallet2"></i>Payments</span>
+          <span><i class="bi bi-phone"></i>Accounts</span>
+          <span><i class="bi bi-laptop"></i>Devices</span>
+        </div>
+      </div>
+      <div class="safety-hero-right">
+        <div class="shield-frame">
+          <div class="shield-wrap">
+            <span class="shield-backdrop"></span>
+            <i class="bi bi-shield-fill-check shield-icon"></i>
+            <span class="shield-pulse"></span>
+            <span class="shield-scan-line"></span>
+          </div>
+          <div class="floating-signal signal-one"><i class="bi bi-check-circle"></i>FraudLens Signal: Secure</div>
+          <div class="floating-signal signal-two"><i class="bi bi-lock"></i>Verified Awareness</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="hub-quick-navigation">
+    <div class="section-title-row compact">
+      <span class="section-label">Cyber Safety Quick Navigation</span>
+    </div>
+    <div class="quick-nav-wrap">
+      <a class="quick-nav-link" href="#threats">Threats</a>
+      <a class="quick-nav-link" href="#passwords">Passwords</a>
+      <a class="quick-nav-link" href="#payments">Payments</a>
+      <a class="quick-nav-link" href="#social">Social Media</a>
+      <a class="quick-nav-link" href="#emails">Email</a>
+      <a class="quick-nav-link" href="#devices">Devices</a>
+      <a class="quick-nav-link" href="#wifi">Wi-Fi</a>
+      <a class="quick-nav-link" href="#shopping">Shopping</a>
+      <a class="quick-nav-link" href="#jobs">Jobs</a>
+      <a class="quick-nav-link" href="#qr-safety">QR Safety</a>
+      <a class="quick-nav-link" href="#emergency">Emergency</a>
+      <a class="quick-nav-link" href="#quick-check">Checklist</a>
+      <a class="quick-nav-link" href="#myths">Myths &amp; Facts</a>
+    </div>
+  </section>
+
+  <section class="hub-search-card">
+    <div class="search-row">
+      <div class="search-label">
+        <i class="bi bi-search"></i><span>Search Cyber Safety Tips</span>
+      </div>
+      <div class="search-input-wrap">
+        <input type="search" id="safetySearch" class="form-control" placeholder="Search phishing, OTP, password, QR, payment, job, social media, Wi-Fi, shopping">
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section" id="threats">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Threat Intelligence</span>
+        <h2>Know the Threats</h2>
+      </div>
+      <span class="section-kicker">16 Security Patterns</span>
+    </div>
+
+    <div class="threat-card-grid">
+      <article class="threat-card cyber-threat-card" data-category="phishing email sms social link" data-title="Phishing">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-envelope-paper-fill"></i></span>
+            <span class="threat-name">Phishing</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">A scam message or email tries to trick you into sharing passwords, OTPs, or account details.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">A fake sender imitates a bank, app, or workplace to gain trust.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Urgent calls, fake links, urgent threats, and requests for personal information.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Verify the sender, never click unknown links, and contact the real organization directly.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="sms smishing" data-title="Smishing">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-chat-dots-fill"></i></span>
+            <span class="threat-name">Smishing</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Smishing uses fake SMS messages that pressure users to click, reply, or reveal information.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">Fraudsters send fake bank, payment, delivery, or OTP SMS messages.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Unknown numbers, shortened links, urgent reminders, and requests for OTP.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Do not reply or click. Verify through the official app or bank number.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="voice vishing phone" data-title="Vishing">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-telephone-fill"></i></span>
+            <span class="threat-name">Vishing</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">A scammer uses voice calls and social engineering to obtain sensitive information.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">The caller pretends to be a bank, help desk, security team, or service agent.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Pressure, secrecy, requests for OTP, and demands to install a remote-access app.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Never share OTP, PIN, or app permissions. Hang up and call the official number.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="qr qr code payment" data-title="QR Code Scams">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-upc-scan"></i></span>
+            <span class="threat-name">QR Code Scams</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">A QR code can send you to a malicious site or open a payment request using disguised content.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">People scan posters, stickers, payments, or fake QR codes in public places.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Unknown QR posters, short URLs, urgent payment requests, and no context.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Preview the link and verify the payment destination before scanning or paying.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="website fake link" data-title="Fake Websites">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-globe2"></i></span>
+            <span class="threat-name">Fake Websites</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Scam pages copy trusted brands and trick users into entering passwords or payment information.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">The fake site uses visual similarities and cloned company names.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Wrong domain spelling, missing security details, and an unfamiliar design.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Type the official address yourself, check the domain, and do not enter credentials from links.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="shopping online payment" data-title="Online Shopping Scams">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-bag-fill"></i></span>
+            <span class="threat-name">Online Shopping Scams</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Fake stores or sellers take money, send nothing, or trick customers through fraudulent offers.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">A discount offer asks for payment before delivery or uses a fake trusted shop page.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Very low prices, fake seller information, and no return policies or reviews.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Buy from trusted stores, verify sellers, and use payment methods with dispute options.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="upi payment scam" data-title="UPI / Payment Scams">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-wallet2"></i></span>
+            <span class="threat-name">UPI / Payment Scams</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Scammers trick people into approving payment requests, sending money, or collecting UPI details.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">An unknown collector or fake refund request asks you to approve a payment.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Urgent collect requests, fake refunds, fake customer care payment requests, or QR messages.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Never share UPI PIN, verify the recipient, and do not approve unknown payment requests.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="otp sms" data-title="OTP Scams">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-key-fill"></i></span>
+            <span class="threat-name">OTP Scams</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Scammers request OTP, PIN, or verification codes to hijack an account or payment.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">A fake caller, message, or link says you must share the OTP for account access.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">A person asks for OTP, saying it is for verification or reward approval.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Never share OTP, PIN, or bank verification codes with anyone.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="job recruitment" data-title="Job Scams">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-briefcase-fill"></i></span>
+            <span class="threat-name">Job Scams</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Fake interviews, fake HR contacts, or fee requests lure job-seekers into losing money or data.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">The scammer offers a job, asks for registration fees, or requests fake training deposits.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Requests for upfront money, suspicious email addresses, and vague company information.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Verify the company, interview process, and messages before sharing personal information.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="investment money" data-title="Investment Scams">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-graph-up-arrow"></i></span>
+            <span class="threat-name">Investment Scams</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Scammers promise high returns or fake trading success to pressure users into investing.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">They build pressure using screenshots, charts, fake experts, and impossible profit claims.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Guaranteed returns, fake profit screenshots, group pressure, and urgency.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Avoid schemes promising guaranteed returns and verify the platform with trusted sources.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="social media account" data-title="Social Media Scams">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-people-fill"></i></span>
+            <span class="threat-name">Social Media Scams</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Scammers pose as friends, influencers, customer support, or businessmen through social media.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">A fake account sends investment tips, DMs, fake prize offers, or requests for payments.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">New accounts, unusual requests, quick payment pressure, and suspicious links.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Keep accounts private, verify requests, and never send money based on direct messages.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="identity theft account" data-title="Identity Theft">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-person-vcard-fill"></i></span>
+            <span class="threat-name">Identity Theft</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Scammers steal information and use it to open accounts, make payments, or access services.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">They collect leaked personal information from fake forms, calls, or data breaches.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Unexpected OTPs, account changes, access alerts, or unknown transactions.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Use unique passwords, secure recovery details, and monitor accounts regularly.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="password attack" data-title="Password Attacks">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-file-lock2-fill"></i></span>
+            <span class="threat-name">Password Attacks</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Attackers try to guess, reuse, or steal account passwords through common means.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">The password may be guessed, reused, stolen by phishing, or exposed in a data breach.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Password reset emails, random login attempts, and password reuse across many accounts.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Use a unique strong password, a password manager, and MFA or passkeys where possible.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="malware software" data-title="Malware">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-bug-fill"></i></span>
+            <span class="threat-name">Malware</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Malware is software installed without consent that may monitor, steal, or damage your device.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">A malicious app, attachment, or file is downloaded and executed on the device.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Unknown apps, device warnings, unusual popups, and faster battery drain.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Download from trusted stores, update devices, and avoid cracked software or APKs.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="ransomware malware" data-title="Ransomware">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-exclamation-octagon-fill"></i></span>
+            <span class="threat-name">Ransomware</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">Ransomware locks or encrypts a device or files and demands payment in exchange for access.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">A user opens a malicious file, receives fake support, or visits a compromised website.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">Unexpected warnings, encrypted files, and demands for money or data.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Keep backups, avoid suspicious downloads, and do not approve remote access requests.</span></div>
+          </div>
+        </button>
+      </article>
+
+      <article class="threat-card cyber-threat-card" data-category="support customer care call" data-title="Fake Customer Care Scams">
+        <button class="threat-card-button" type="button">
+          <div class="threat-card-head">
+            <span class="threat-icon"><i class="bi bi-headset"></i></span>
+            <span class="threat-name">Fake Customer Care Scams</span>
+            <span class="threat-arrow"><i class="bi bi-chevron-down"></i></span>
+          </div>
+          <p class="threat-explain">A scammer claims to be a support representative and asks for remote access or money.</p>
+          <div class="threat-details">
+            <div class="detail-row"><span class="detail-label">How it happens</span><span class="detail-text">The scammer contacts you through calls, messages, or fake support portals.</span></div>
+            <div class="detail-row"><span class="detail-label">Warning Signs</span><span class="detail-text">They ask you to install software, share OTP, or allow remote access.</span></div>
+            <div class="detail-row"><span class="detail-label">How to stay safe</span><span class="detail-text">Use official contact numbers and never install apps or share OTP for support.</span></div>
+          </div>
+        </button>
+      </article>
+    </div>
+  </section>
+
+  <section class="content-section warning-section">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Red Flag Patterns</span>
+        <h2>🚨 Common Cyber Red Flags</h2>
+      </div>
+      <span class="section-kicker">Stay Suspicious</span>
+    </div>
+    <div class="red-flag-grid">
+      <article class="red-flag-card"><span class="red-flag-icon"><i class="bi bi-exclamation-triangle-fill"></i></span><div><strong>Act Now or Your Account Will Be Blocked</strong><small>Urgency and fear are often used to pressure quick decisions.</small></div></article>
+      <article class="red-flag-card"><span class="red-flag-icon"><i class="bi bi-gift-fill"></i></span><div><strong>You Won a Prize!</strong><small>Unexpected rewards usually require verification, payment, or personal data.</small></div></article>
+      <article class="red-flag-card"><span class="red-flag-icon"><i class="bi bi-key-fill"></i></span><div><strong>Share Your OTP</strong><small>No legitimate service should request a one-time password for account verification.</small></div></article>
+      <article class="red-flag-card"><span class="red-flag-icon"><i class="bi bi-cash-stack"></i></span><div><strong>Send Money for Verification</strong><small>Verification or refund requests should never require you to send money.</small></div></article>
+      <article class="red-flag-card"><span class="red-flag-icon"><i class="bi bi-link-45deg"></i></span><div><strong>Click This Urgent Link</strong><small>Urgent link requests often hide fake websites or malware files.</small></div></article>
+      <article class="red-flag-card"><span class="red-flag-icon"><i class="bi bi-download"></i></span><div><strong>Install This App for Support</strong><small>Unknown apps may be remote-access tools or malware.</small></div></article>
+      <article class="red-flag-card"><span class="red-flag-icon"><i class="bi bi-graph-up-arrow"></i></span><div><strong>Guaranteed Investment Returns</strong><small>High guaranteed returns are a classic warning sign.</small></div></article>
+      <article class="red-flag-card"><span class="red-flag-icon"><i class="bi bi-person-check-fill"></i></span><div><strong>Your KYC Has Expired</strong><small>Scammers use financial or identity pressure to steal documents or money.</small></div></article>
+      <article class="red-flag-card"><span class="red-flag-icon"><i class="bi bi-phone"></i></span><div><strong>Your SIM Will Be Blocked</strong><small>Urgent SIM or telecom claims are often false, used to harvest data.</small></div></article>
+      <article class="red-flag-card"><span class="red-flag-icon"><i class="bi bi-box-seam"></i></span><div><strong>Your Package Is Stuck</strong><small>Bank or delivery messages should include clear official details and context.</small></div></article>
+    </div>
+  </section>
+
+  <section class="content-section split-section" id="passwords">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Password Security</span>
+        <h2>🔐 Password Security</h2>
+      </div>
+      <span class="section-kicker">Identity Protection</span>
+    </div>
+    <div class="grid-two">
+      <div class="info-panel">
+        <div class="info-panel-inner">
+          <ul class="security-list">
+            <li><i class="bi bi-check2-circle"></i><strong>Use a strong password</strong><span>Use at least 12–16 characters with upper and lower case, numbers, and symbols.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Unique password for every account</strong><span>Never reuse a password across personal, bank, email, or shopping accounts.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Use a password manager</strong><span>Store passwords securely and generate unique, complex passwords.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Enable MFA</strong><span>Add a second factor like authenticator apps, hardware keys, or recovery codes.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Passkeys</strong><span>Use passkeys when supported for stronger, password-free sign-in.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Avoid common mistakes</strong><span>Do not write passwords in notebooks, shared notes, or reuse birthdays and pet names.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tips-panel">
+        <div class="tips-panel-title"><span>🔑 Password Strength Tips</span></div>
+        <div class="strength-meter">
+          <span class="meter-label">Password strength</span>
+          <div class="strength-bar"><div class="strength-bar-fill" style="width:72%;"></div></div>
+          <div class="strength-meta">
+            <span class="meta-chip"><i class="bi bi-rulers"></i>12+ length</span>
+            <span class="meta-chip"><i class="bi bi-stars"></i>Unique</span>
+            <span class="meta-chip"><i class="bi bi-shield-lock"></i>Never reuse</span>
+          </div>
+        </div>
+        <div class="password-tips">
+          <div class="tip-line"><i class="bi bi-dot"></i>Use a passphrase that is memorable but not personal.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Store recovery email and phone carefully.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Do not share passwords over calls or messages.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Set up MFA and update recovery details.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section split-section" id="payments">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">OTP, UPI &amp; Payment Safety</span>
+        <h2>💳 OTP, UPI &amp; Payment Safety</h2>
+      </div>
+      <span class="section-kicker">Before You Pay</span>
+    </div>
+    <div class="grid-two">
+      <div class="info-panel">
+        <div class="info-panel-inner">
+          <ul class="security-list">
+            <li><i class="bi bi-check2-circle"></i><strong>Never share OTP</strong><span>OTP is a verification code. Do not share it with anyone, including fake support agents.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Never share your UPI PIN</strong><span>UPI PIN should never be revealed for any reason.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Bank never asks for UPI PIN to receive money</strong><span>Receiving payments should never require your UPI PIN.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Never approve unknown collect requests</strong><span>Check the recipient before approving any payment or request.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>QR codes can make payments</strong><span>Scan only after previewing the payment destination and verifying the amount.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Verify payment screenshots</strong><span>Do not trust screenshots alone as proof of payment.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tips-panel">
+        <div class="tips-panel-title"><span>Before You Pay Checklist</span></div>
+        <div class="checklist-list">
+          <label class="custom-check"><input type="checkbox"> <span>Verified recipient</span></label>
+          <label class="custom-check"><input type="checkbox"> <span>Amount matches request</span></label>
+          <label class="custom-check"><input type="checkbox"> <span>No OTP or UPI PIN shared</span></label>
+          <label class="custom-check"><input type="checkbox"> <span>Collect request is trusted</span></label>
+          <label class="custom-check"><input type="checkbox"> <span>Payment link or QR is reviewed</span></label>
+          <label class="custom-check"><input type="checkbox"> <span>No unknown remote-support app</span></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section split-section" id="social">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Social Media Safety</span>
+        <h2>📱 Social Media Safety</h2>
+      </div>
+      <span class="section-kicker">Public Privacy</span>
+    </div>
+    <div class="grid-two">
+      <div class="info-panel">
+        <div class="info-panel-inner">
+          <ul class="security-list">
+            <li><i class="bi bi-check2-circle"></i><strong>Keep accounts private</strong><span>Use privacy controls where appropriate and limit public access.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Avoid oversharing</strong><span>Do not post your full address, phone, family details, or routine location openly.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Do not share live location</strong><span>Never broadcast location updates publicly or in groups you do not trust.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Beware of fake profiles</strong><span>Check friend requests and profile details before responding.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Report suspicious accounts</strong><span>Report impersonation, harassment, fake investment requests, and suspicious DMs.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tips-panel">
+        <div class="tips-panel-title"><span>Social Media Hygiene</span></div>
+        <div class="password-tips">
+          <div class="tip-line"><i class="bi bi-dot"></i>Use strong recovery email and phone.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Enable 2FA and review active sessions.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Do not click suspicious DMs or shortened links.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Review who follows and interacts with your account.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section split-section" id="emails">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Email &amp; Message Safety</span>
+        <h2>📧 Email &amp; Message Safety</h2>
+      </div>
+      <span class="section-kicker">Message Hygiene</span>
+    </div>
+    <div class="grid-two">
+      <div class="info-panel">
+        <div class="info-panel-inner">
+          <ul class="security-list">
+            <li><i class="bi bi-check2-circle"></i><strong>Check sender addresses</strong><span>Look closely for suspicious domains, first-name variations, and fake email hosts.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Be careful with urgent language</strong><span>Threats and pressure are common for scam email and SMS.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Do not open unknown attachments</strong><span>Links or attachments from unknown senders may contain malware or fake forms.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Watch fake invoices and delivery messages</strong><span>Scammers use fake invoices, coupon, and shipping updates to send links.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Read spelling and domain details</strong><span>Watch for typos, extra words, or strange brand variations in the email address.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tips-panel">
+        <div class="tips-panel-title"><span>SAFE vs SUSPICIOUS Examples</span></div>
+        <div class="safe-vs-example">
+          <div class="example-row">
+            <span class="example-label safe-text">SAFE</span>
+            <span class="example-line">FraudLens Support: update your account settings from your trusted app.</span>
+          </div>
+          <div class="example-row">
+            <span class="example-label risky-text">SUSPICIOUS</span>
+            <span class="example-line">Urgent bank verification — click now or lose access.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section split-section" id="devices">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Device Security</span>
+        <h2>💻 Device Security</h2>
+      </div>
+      <span class="section-kicker">Protected Devices</span>
+    </div>
+    <div class="grid-two">
+      <div class="info-panel">
+        <div class="info-panel-inner">
+          <ul class="security-list">
+            <li><i class="bi bi-check2-circle"></i><strong>Keep OS updated</strong><span>Install trusted operating system updates and vendor security patches.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Update browsers</strong><span>Keep your browser current and configure safe defaults.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Install only trusted apps</strong><span>Use official app stores and avoid APK downloads or cracked software.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Use screen lock and encryption</strong><span>Protect your phone or laptop with a biometric or PIN screen lock.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Backup important data</strong><span>Keep backups of important files and documents.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tips-panel">
+        <div class="tips-panel-title"><span>Device Safety actions</span></div>
+        <div class="password-tips">
+          <div class="tip-line"><i class="bi bi-dot"></i>Do not use unknown USB devices.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Use reputable security software.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Enable device encryption where available.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Do not install pirated or cracked software.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section split-section" id="wifi">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Public Wi-Fi Safety</span>
+        <h2>📶 Public Wi-Fi Safety</h2>
+      </div>
+      <span class="section-kicker">Network Awareness</span>
+    </div>
+    <div class="grid-two">
+      <div class="info-panel">
+        <div class="info-panel-inner">
+          <ul class="security-list">
+            <li><i class="bi bi-check2-circle"></i><strong>Verify the network name</strong><span>Confirm the official Wi-Fi network name before connecting.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Avoid sensitive transactions</strong><span>Do not make online payments or share OTPs on public or unknown networks.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Turn off auto-connect</strong><span>Disable automatic joining to unknown Wi-Fi networks.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Use HTTPS</strong><span>Ensure the websites you visit use secure HTTPS and trusted domains.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Forget unused networks</strong><span>Remove networks you no longer use to reduce future exposure.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tips-panel">
+        <div class="tips-panel-title"><span>Public Wi-Fi Rules</span></div>
+        <div class="password-tips">
+          <div class="tip-line"><i class="bi bi-dot"></i>Use your mobile hotspot when possible for sensitive tasks.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Avoid sending passwords or payments over public Wi-Fi.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Use trusted VPN only if you know the service.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Do not accept a network login page without checking the location.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section split-section" id="shopping">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Online Shopping Safety</span>
+        <h2>🛒 Online Shopping Safety</h2>
+      </div>
+      <span class="section-kicker">Purchase Awareness</span>
+    </div>
+    <div class="grid-two">
+      <div class="info-panel">
+        <div class="info-panel-inner">
+          <ul class="security-list">
+            <li><i class="bi bi-check2-circle"></i><strong>Check website and domain</strong><span>Look for spelling, secure address, return policy, and trusted branding.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Avoid unbelievable discounts</strong><span>Very low prices can indicate fake shops or counterfeit goods.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Check seller information</strong><span>Search reviews and verify the business address and contact details.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Use trusted payment methods</strong><span>Prefer methods with dispute support rather than payments made by advance transfer.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Do not download APKs from messages</strong><span>Fake shopping messages may send APK files or payment apps.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tips-panel">
+        <div class="tips-panel-title"><span>Shopping Rules</span></div>
+        <div class="password-tips">
+          <div class="tip-line"><i class="bi bi-dot"></i>Do not share OTPs unnecessarily.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Review return, refund, and delivery policy.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Never send money before confirming seller identity.</div>
+          <div class="tip-line"><i class="bi bi-dot"></i>Check if the seller uses an official website or store.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section split-section" id="jobs">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Job Scam Safety</span>
+        <h2>💼 Job Scam Safety</h2>
+      </div>
+      <span class="section-kicker">Before Accepting a Job Offer</span>
+    </div>
+    <div class="grid-two">
+      <div class="info-panel">
+        <div class="info-panel-inner">
+          <ul class="security-list">
+            <li><i class="bi bi-check2-circle"></i><strong>Verify the company</strong><span>Search for the real HR handle, official email domain, and company profile.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Do not pay registration fees</strong><span>Scam offers ask for security deposit, training, or legal fee payments.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Beware fake work-from-home offers</strong><span>Watch for offers that ask you to install unknown apps or software.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Never share OTP or bank credentials</strong><span>Fake interviews ask for OTP, bank credentials, or sensitive personal data.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Offer letter verification</strong><span>Verify documents, company address, and real recruitment communication.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tips-panel">
+        <div class="tips-panel-title"><span>Before Accepting a Job Offer</span></div>
+        <div class="checklist-list">
+          <label class="custom-check"><input type="checkbox"> <span>Company website and HR email verified</span></label>
+          <label class="custom-check"><input type="checkbox"> <span>No upfront registration or deposit fee</span></label>
+          <label class="custom-check"><input type="checkbox"> <span>No OTP or bank details requested</span></label>
+          <label class="custom-check"><input type="checkbox"> <span>No unknown app installation</span></label>
+          <label class="custom-check"><input type="checkbox"> <span>Interview process is official and transparent</span></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section split-section">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Investment Scam Awareness</span>
+        <h2>📈 Investment Scam Awareness</h2>
+      </div>
+      <span class="section-kicker">High Risk</span>
+    </div>
+    <div class="grid-two">
+      <div class="info-panel">
+        <div class="info-panel-inner">
+          <ul class="security-list">
+            <li><i class="bi bi-check2-circle"></i><strong>Guaranteed returns</strong><span>High guaranteed returns are a major warning sign.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Fake trading platforms</strong><span>Use trusted financial education and verified official investment resources.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Fake crypto or investment groups</strong><span>Do not trust strangers or groups that pressure you to invest quickly.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Impersonation of financial experts</strong><span>Verify credentials from official sources rather than social profiles.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Fake screenshots</strong><span>Profit screenshots can be copied or manipulated by scammers.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tips-panel">
+        <div class="tips-panel-title"><span>Remember</span></div>
+        <div class="investment-warning">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <p>High guaranteed returns are a major warning sign.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section split-section" id="qr-safety">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">QR Code Safety</span>
+        <h2>▣ QR Code Safety</h2>
+      </div>
+      <span class="section-kicker">Scan Before You Trust</span>
+    </div>
+    <div class="grid-two">
+      <div class="info-panel">
+        <div class="info-panel-inner">
+          <ul class="security-list">
+            <li><i class="bi bi-check2-circle"></i><strong>Do not scan unknown QR codes</strong><span>Review the source before scanning anything in public, email, or messages.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Check the action</strong><span>Look at whether it opens payment, login, file download, or a site.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Verify payment recipients</strong><span>Always check the displayed beneficiary or payment flow before sending money.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Never enter sensitive info</strong><span>Never type passwords, OTPs, or payment details on an unverified site.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tips-panel">
+        <div class="tips-panel-title"><span>Scan Safely</span></div>
+        <div class="quick-action">
+          <a class="btn btn-primary" href="{{ url_for('qr_scanner') }}"><i class="bi bi-qr-code-scan me-2"></i>Scan Safely with FraudLens</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section split-section">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Safe Browsing Habits</span>
+        <h2>🌐 Safe Browsing Habits</h2>
+      </div>
+      <span class="section-kicker">Before You Click</span>
+    </div>
+    <div class="grid-two">
+      <div class="info-panel">
+        <div class="info-panel-inner">
+          <ul class="security-list">
+            <li><i class="bi bi-check2-circle"></i><strong>Check HTTPS and domain spelling</strong><span>Make sure the website is real, clear, and not an unexpected short or misspelled domain.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Beware of shortened links</strong><span>Preview and verify links before clicking them.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Avoid popups</strong><span>Do not download or allow files from suspicious popups.</span></li>
+            <li><i class="bi bi-check2-circle"></i><strong>Do not ignore browser warnings</strong><span>Security warnings often identify risky or fake websites.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tips-panel">
+        <div class="tips-panel-title"><span>Verify a Link</span></div>
+        <div class="quick-action">
+          <a class="btn btn-outline-soft" href="{{ url_for('link_checker') }}"><i class="bi bi-link-45deg me-2"></i>Check a Link with FraudLens</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section emergency-section" id="emergency">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Emergency Action Guide</span>
+        <h2>🚨 What To Do If You Think You Were Scammed</h2>
+      </div>
+      <span class="section-kicker">Act Fast</span>
+    </div>
+    <div class="emergency-grid">
+      <div class="emergency-step"><span class="step-num">1</span><span class="step-text">Stop communicating with the scammer.</span></div>
+      <div class="emergency-step"><span class="step-num">2</span><span class="step-text">Do not send more money.</span></div>
+      <div class="emergency-step"><span class="step-num">3</span><span class="step-text">Change compromised passwords.</span></div>
+      <div class="emergency-step"><span class="step-num">4</span><span class="step-text">Enable MFA on important accounts.</span></div>
+      <div class="emergency-step"><span class="step-num">5</span><span class="step-text">Contact your bank or payment provider.</span></div>
+      <div class="emergency-step"><span class="step-num">6</span><span class="step-text">Block and report the scammer.</span></div>
+      <div class="emergency-step"><span class="step-num">7</span><span class="step-text">Preserve screenshots and payment details.</span></div>
+      <div class="emergency-step"><span class="step-num">8</span><span class="step-text">Scan your device if malware is suspected.</span></div>
+      <div class="emergency-step"><span class="step-num">9</span><span class="step-text">Report through official channels.</span></div>
+    </div>
+  </section>
+
+  <section class="content-section checklist-section" id="quick-check">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Quick Security Check</span>
+        <h2>✅ 10-Second Security Check</h2>
+      </div>
+      <span class="section-kicker">Local only</span>
+    </div>
+    <div class="checklist-grid">
+      <label class="check-row"><input type="checkbox"><span>I use unique passwords</span></label>
+      <label class="check-row"><input type="checkbox"><span>I use MFA where available</span></label>
+      <label class="check-row"><input type="checkbox"><span>I never share OTP/PIN</span></label>
+      <label class="check-row"><input type="checkbox"><span>I verify links before clicking</span></label>
+      <label class="check-row"><input type="checkbox"><span>I verify payment recipients</span></label>
+      <label class="check-row"><input type="checkbox"><span>My device is updated</span></label>
+      <label class="check-row"><input type="checkbox"><span>I avoid unknown APKs</span></label>
+      <label class="check-row"><input type="checkbox"><span>I review account activity</span></label>
+      <label class="check-row"><input type="checkbox"><span>I don't overshare personal information</span></label>
+      <label class="check-row"><input type="checkbox"><span>I know how to report a scam</span></label>
+    </div>
+  </section>
+
+  <section class="content-section myth-section" id="myths">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Cyber Security Myth vs Fact</span>
+        <h2>🧠 Cyber Security Myth vs Fact</h2>
+      </div>
+      <span class="section-kicker">Know the Real Risks</span>
+    </div>
+    <div class="myth-grid">
+      <article class="myth-card">
+        <button class="myth-button" type="button">
+          <span class="myth-inner">
+            <span class="myth-front">
+              <span class="myth-label">MYTH</span>
+              <span class="myth-text">HTTPS means every website is trustworthy.</span>
+            </span>
+            <span class="myth-back">
+              <span class="myth-label fact-label">FACT</span>
+              <span class="myth-text">HTTPS encrypts the connection, but a scam website can also use HTTPS.</span>
+            </span>
+          </span>
+        </button>
+      </article>
+      <article class="myth-card">
+        <button class="myth-button" type="button">
+          <span class="myth-inner">
+            <span class="myth-front">
+              <span class="myth-label">MYTH</span>
+              <span class="myth-text">Only old people get scammed.</span>
+            </span>
+            <span class="myth-back">
+              <span class="myth-label fact-label">FACT</span>
+              <span class="myth-text">Anyone can become a target.</span>
+            </span>
+          </span>
+        </button>
+      </article>
+      <article class="myth-card">
+        <button class="myth-button" type="button">
+          <span class="myth-inner">
+            <span class="myth-front">
+              <span class="myth-label">MYTH</span>
+              <span class="myth-text">QR codes are always safe.</span>
+            </span>
+            <span class="myth-back">
+              <span class="myth-label fact-label">FACT</span>
+              <span class="myth-text">A QR code can lead to a malicious website or payment request.</span>
+            </span>
+          </span>
+        </button>
+      </article>
+      <article class="myth-card">
+        <button class="myth-button" type="button">
+          <span class="myth-inner">
+            <span class="myth-front">
+              <span class="myth-label">MYTH</span>
+              <span class="myth-text">Antivirus protects me from every scam.</span>
+            </span>
+            <span class="myth-back">
+              <span class="myth-label fact-label">FACT</span>
+              <span class="myth-text">Security software cannot prevent every social-engineering scam.</span>
+            </span>
+          </span>
+        </button>
+      </article>
+    </div>
+  </section>
+
+  <section class="content-section score-section">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Self Check</span>
+        <h2>🛡️ How Cyber-Safe Are You?</h2>
+      </div>
+      <span class="section-kicker">Browser only</span>
+    </div>
+    <div class="score-panel">
+      <div class="score-top">
+        <div class="score-question-wrap">
+          <div class="question-row"><label><input class="score-question" type="checkbox" value="1">Do you use MFA?</label></div>
+          <div class="question-row"><label><input class="score-question" type="checkbox" value="1">Do you use unique passwords?</label></div>
+          <div class="question-row"><label><input class="score-question" type="checkbox" value="1">Do you verify links?</label></div>
+          <div class="question-row"><label><input class="score-question" type="checkbox" value="1">Do you share OTPs?</label></div>
+          <div class="question-row"><label><input class="score-question" type="checkbox" value="1">Do you install unknown APKs?</label></div>
+          <div class="question-row"><label><input class="score-question" type="checkbox" value="1">Do you verify payment requests?</label></div>
+        </div>
+        <div class="score-result">
+          <span class="score-label">Score</span>
+          <span class="score-number" id="cyberScore">0%</span>
+          <span class="score-band" id="scoreBand">Needs Improvement</span>
+          <button class="btn btn-outline-soft btn-sm" id="scoreReset">Reset</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section tip-section">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Security Tips of the Day</span>
+        <h2>💡 Security Tip of the Day</h2>
+      </div>
+      <button class="btn btn-outline-soft btn-sm" id="nextTip"><span>Next Tip →</span></button>
+    </div>
+    <div class="tip-card">
+      <div class="tip-card-inner">
+        <span class="tip-icon"><i class="bi bi-lightbulb-fill"></i></span>
+        <span class="tip-text" id="tipText">Keep your software updated to reduce avoidable risks.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section help-section">
+    <div class="section-title-row">
+      <div>
+        <span class="section-label">Need Help?</span>
+        <h2>Need Help?</h2>
+      </div>
+      <span class="section-kicker">Report &amp; Recover</span>
+    </div>
+    <div class="help-grid">
+      <div class="help-card"><i class="bi bi-bank"></i><span>Contact your bank or payment provider for financial fraud.</span></div>
+      <div class="help-card"><i class="bi bi-shield-exclamation"></i><span>Use official cybercrime reporting channels.</span></div>
+      <div class="help-card"><i class="bi bi-headset"></i><span>Contact the supported app or platform team.</span></div>
+      <div class="help-card"><i class="bi bi-camera-fill"></i><span>Preserve relevant screenshots and transaction evidence.</span></div>
+    </div>
+  </section>
+
+  <footer class="fl-footer text-center">
+    FraudLens - AI Powered Scam Detection System 2026
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
