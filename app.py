@@ -13,14 +13,20 @@ Run:
 import io
 import json
 import os
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 from functools import wraps
+
+try:
+    import requests
+except ImportError:  # pragma: no cover
+    requests = None
 
 # Heavy libraries (joblib, pandas, sklearn, cv2) are imported lazily
 # within the route handlers or helpers to avoid blocking app startup.
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    session, jsonify, send_file, flash
+    session, jsonify, send_file, flash, render_template_string
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -28,7 +34,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from db import (
     check_user_by_email, create_user, get_user_by_id, get_all_users,
     save_sms_scan, save_link_scan, save_qr_scan,
-    get_scan_history, get_scan_stats, DatabaseUnavailableError
+    get_scan_history, get_scan_stats, DatabaseUnavailableError,
+    ensure_password_reset_tokens_table, create_password_reset_token,
+    get_password_reset_token_record, mark_password_reset_token_used,
+    update_user_password
 )
 
 # ---------------------------------------------------------------------------
@@ -79,6 +88,104 @@ def ensure_models_loaded():
 
 # Database initialization removed — MySQL connection is handled per-request.
 # See db.py for database functions.
+
+APP_BASE_URL = (os.environ.get("APP_BASE_URL") or "http://127.0.0.1:5000").rstrip("/")
+
+
+def ensure_password_reset_table():
+    try:
+        ensure_password_reset_tokens_table()
+    except DatabaseUnavailableError as exc:
+        app.logger.warning("Password reset table unavailable: %s", exc)
+
+
+def send_brevo_email(to_email, subject, html_content, text_content=None):
+    if requests is None:
+        app.logger.warning("Brevo email not sent because the requests dependency is unavailable.")
+        return False
+
+    api_key = os.environ.get("BREVO_API_KEY")
+    sender_email = os.environ.get("BREVO_SENDER_EMAIL")
+    sender_name = os.environ.get("BREVO_SENDER_NAME") or "FraudLens"
+
+    if not api_key or not sender_email:
+        app.logger.warning("Brevo email not sent: missing BREVO_API_KEY or BREVO_SENDER_EMAIL.")
+        return False
+
+    payload = {
+        "sender": {"name": sender_name, "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_content,
+        "textContent": text_content or "FraudLens email"
+    }
+
+    try:
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "api-key": api_key,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            json=payload,
+            timeout=15,
+        )
+        if response.status_code not in (200, 201, 202):
+            app.logger.warning(
+                "Brevo email send failed for %s: status=%s body=%s",
+                to_email,
+                response.status_code,
+                response.text[:500],
+            )
+            return False
+        return True
+    except requests.RequestException as exc:
+        app.logger.warning("Brevo email request failed for %s: %s", to_email, exc)
+        return False
+
+
+def send_welcome_email(user_name, user_email):
+    if not user_email:
+        return False
+    subject = "Welcome to FraudLens"
+    html = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6; background: #f8fafc; padding: 24px;">
+        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 28px;">
+          <h2 style="margin-top: 0; color: #0f172a;">Welcome to FraudLens, {user_name}!</h2>
+          <p>Your FraudLens account was successfully created.</p>
+          <p>You can now use FraudLens to check suspicious messages, links, and QR codes with confidence.</p>
+          <p style="margin-top: 20px; color: #475569;">FraudLens - AI Powered Scam Detection System 2026</p>
+        </div>
+      </body>
+    </html>
+    """
+    return send_brevo_email(user_email, subject, html, text_content=f"Welcome to FraudLens, {user_name}! Your account was successfully created.")
+
+
+def send_password_reset_email(user_name, user_email, raw_token):
+    if not user_email or not raw_token:
+        return False
+    expires_at = datetime.utcnow() + timedelta(minutes=30)
+    reset_url = f"{APP_BASE_URL}{url_for('reset_password', token=raw_token)}"
+    subject = "Reset your FraudLens password"
+    display_name = user_name or "there"
+    html = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6; background: #f8fafc; padding: 24px;">
+        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 28px;">
+          <h2 style="margin-top: 0; color: #0f172a;">Hello {display_name},</h2>
+          <p>We received a request to reset your FraudLens password.</p>
+          <p><a href=\"{reset_url}\" style=\"display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 18px; border-radius: 8px; font-weight: bold;\">Reset Password</a></p>
+          <p>This link will expire at {expires_at.strftime('%Y-%m-%d %H:%M UTC')}.</p>
+          <p>If you did not request a password reset, you can safely ignore this email and your current password will remain unchanged.</p>
+          <p style="margin-top: 20px; color: #475569;">FraudLens - AI Powered Scam Detection System 2026</p>
+        </div>
+      </body>
+    </html>
+    """
+    return send_brevo_email(user_email, subject, html, text_content=f"Hello {display_name},\n\nReset your FraudLens password here: {reset_url}\n\nThis link expires at {expires_at.strftime('%Y-%m-%d %H:%M UTC')}. If you did not request this, ignore this email.")
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +238,144 @@ def index():
     return redirect(url_for("login"))
 
 
+FORGOT_PASSWORD_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forgot Password — FraudLens</title>
+  <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+<div class="auth-shell">
+  <div class="auth-side-panel">
+    <div class="scan-ring r1"></div>
+    <div class="scan-ring r2"></div>
+    <div class="scan-ring r3"></div>
+    <div class="scan-sweep"></div>
+    <div class="fl-brand" style="position:relative; z-index:2;">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="FraudLens Logo" class="fl-logo-img">
+      <div class="fl-logo-fallback" style="background:#fff;">FL</div>
+      <div class="fl-brand-text">
+        <span class="fl-brand-name" style="color:#fff;">FraudLens</span>
+        <span class="fl-brand-sub" style="color:rgba(255,255,255,0.7);">AI Powered Scam Detection</span>
+      </div>
+    </div>
+    <div style="position:relative; z-index:2; max-width:420px;">
+      <h1 style="color:#fff; font-size:2.1rem; margin-bottom:1rem;">Reset access securely.</h1>
+      <p style="color:rgba(255,255,255,0.78); font-size:0.95rem;">Enter your email and we’ll send a secure link to help you choose a new password.</p>
+    </div>
+    <p style="position:relative; z-index:2; color:rgba(255,255,255,0.55); font-size:0.8rem; margin:0;">
+      FraudLens - AI Powered Scam Detection System 2026
+    </p>
+  </div>
+  <div class="auth-form-panel">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h2 style="font-size:1.5rem;">Forgot your password?</h2>
+        <p class="auth-tagline">We’ll send a reset link to your registered email.</p>
+      </div>
+      {% if message %}
+      <div class="alert alert-info mt-2 mb-3" role="alert">{{ message }}</div>
+      {% endif %}
+      {% if error %}
+      <div class="alert alert-danger mt-2 mb-3" role="alert">{{ error }}</div>
+      {% endif %}
+      <form method="POST" action="{{ url_for('forgot_password') }}" novalidate>
+        <div class="mb-3">
+          <label for="emailInput" class="form-label">Email address</label>
+          <input type="email" class="form-control" id="emailInput" name="email" placeholder="you@example.com" autocomplete="email" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 btn-lg-touch">
+          <i class="bi bi-send me-1"></i> Send Reset Link
+        </button>
+      </form>
+      <p class="auth-footnote mt-3">
+        Back to <a href="{{ url_for('login') }}" class="text-accent fw-semibold">Login</a>
+      </p>
+    </div>
+  </div>
+</div>
+</body>
+</html>
+"""
+
+RESET_PASSWORD_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Password — FraudLens</title>
+  <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+<div class="auth-shell">
+  <div class="auth-side-panel">
+    <div class="scan-ring r1"></div>
+    <div class="scan-ring r2"></div>
+    <div class="scan-ring r3"></div>
+    <div class="scan-sweep"></div>
+    <div class="fl-brand" style="position:relative; z-index:2;">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="FraudLens Logo" class="fl-logo-img">
+      <div class="fl-logo-fallback" style="background:#fff;">FL</div>
+      <div class="fl-brand-text">
+        <span class="fl-brand-name" style="color:#fff;">FraudLens</span>
+        <span class="fl-brand-sub" style="color:rgba(255,255,255,0.7);">AI Powered Scam Detection</span>
+      </div>
+    </div>
+    <div style="position:relative; z-index:2; max-width:420px;">
+      <h1 style="color:#fff; font-size:2.1rem; margin-bottom:1rem;">Choose a new password.</h1>
+      <p style="color:rgba(255,255,255,0.78); font-size:0.95rem;">Make it strong and unique to keep your account secure.</p>
+    </div>
+    <p style="position:relative; z-index:2; color:rgba(255,255,255,0.55); font-size:0.8rem; margin:0;">
+      FraudLens - AI Powered Scam Detection System 2026
+    </p>
+  </div>
+  <div class="auth-form-panel">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h2 style="font-size:1.5rem;">Set a new password</h2>
+      </div>
+      {% if success %}
+      <div class="alert alert-success mt-2 mb-3" role="alert">{{ success }}</div>
+      <a href="{{ url_for('login') }}" class="btn btn-primary w-100 btn-lg-touch">Go to Login</a>
+      {% else %}
+      {% if error %}
+      <div class="alert alert-danger mt-2 mb-3" role="alert">{{ error }}</div>
+      {% endif %}
+      <form method="POST" action="{{ url_for('reset_password', token=token) }}" novalidate>
+        <div class="mb-3">
+          <label for="newPassword" class="form-label">New password</label>
+          <input type="password" class="form-control" id="newPassword" name="new_password" placeholder="At least 8 characters" autocomplete="new-password" required>
+        </div>
+        <div class="mb-3">
+          <label for="confirmPassword" class="form-label">Confirm new password</label>
+          <input type="password" class="form-control" id="confirmPassword" name="confirm_password" placeholder="Re-enter your new password" autocomplete="new-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 btn-lg-touch">
+          <i class="bi bi-shield-lock me-1"></i> Update Password
+        </button>
+      </form>
+      {% endif %}
+      <p class="auth-footnote mt-3">
+        Back to <a href="{{ url_for('login') }}" class="text-accent fw-semibold">Login</a>
+      </p>
+    </div>
+  </div>
+</div>
+</body>
+</html>
+"""
+
+
 @app.route("/login", methods=["GET"])
 def login():
     if "user_id" in session:
@@ -143,6 +388,88 @@ def register():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
     return render_template("register.html")
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if "user_id" in session:
+        return redirect(url_for("dashboard"))
+
+    if request.method == "GET":
+        return render_template_string(FORGOT_PASSWORD_TEMPLATE)
+
+    email = (request.form.get("email") or "").strip().lower()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        return render_template_string(FORGOT_PASSWORD_TEMPLATE, error="Please enter a valid email address."), 400
+
+    ensure_password_reset_table()
+
+    try:
+        user = check_user_by_email(email)
+    except DatabaseUnavailableError as exc:
+        app.logger.error("MySQL unavailable during password reset request: %s", exc)
+        return render_template_string(
+            FORGOT_PASSWORD_TEMPLATE,
+            error="We couldn't reach the database right now. Please try again in a moment."
+        ), 503
+
+    if user:
+        try:
+            raw_token = secrets.token_urlsafe(32)
+            expires_at = datetime.utcnow() + timedelta(minutes=30)
+            if not create_password_reset_token(user["id"], raw_token, expires_at.strftime("%Y-%m-%d %H:%M:%S")):
+                app.logger.warning("Password reset token could not be stored for user_id=%s", user["id"])
+            else:
+                send_password_reset_email(user.get("full_name"), user.get("email"), raw_token)
+        except Exception as exc:  # pragma: no cover
+            app.logger.warning("Password reset email processing failed for %s: %s", email, exc)
+
+    return render_template_string(
+        FORGOT_PASSWORD_TEMPLATE,
+        message="If an account exists for this email, a password reset link has been sent."
+    )
+
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    if request.method == "GET":
+        return render_template_string(RESET_PASSWORD_TEMPLATE, token=token)
+
+    new_password = request.form.get("new_password") or ""
+    confirm_password = request.form.get("confirm_password") or ""
+
+    if len(new_password) < 8:
+        return render_template_string(RESET_PASSWORD_TEMPLATE, token=token, error="Password must be at least 8 characters."), 400
+    if new_password != confirm_password:
+        return render_template_string(RESET_PASSWORD_TEMPLATE, token=token, error="Passwords do not match."), 400
+
+    record = get_password_reset_token_record(token)
+    if not record:
+        return render_template_string(RESET_PASSWORD_TEMPLATE, token=token, error="This password reset link is invalid or has expired."), 400
+    if record.get("used"):
+        return render_template_string(RESET_PASSWORD_TEMPLATE, token=token, error="This password reset link has already been used."), 400
+
+    expires_at = record.get("expires_at")
+    if isinstance(expires_at, str):
+        expires_at = datetime.strptime(expires_at, "%Y-%m-%d %H:%M:%S")
+    if expires_at < datetime.utcnow():
+        return render_template_string(RESET_PASSWORD_TEMPLATE, token=token, error="This password reset link has expired."), 400
+
+    password_hash = generate_password_hash(new_password, method="pbkdf2:sha256")
+    try:
+        if not update_user_password(record["user_id"], password_hash):
+            return render_template_string(RESET_PASSWORD_TEMPLATE, token=token, error="Could not update your password. Please try again."), 500
+        if not mark_password_reset_token_used(token):
+            app.logger.warning("Password reset token could not be invalidated for user_id=%s", record["user_id"])
+    except DatabaseUnavailableError as exc:
+        app.logger.error("MySQL unavailable while resetting password: %s", exc)
+        return render_template_string(RESET_PASSWORD_TEMPLATE, token=token, error="We couldn't reach the database right now. Please try again in a moment."), 503
+
+    return render_template_string(
+        RESET_PASSWORD_TEMPLATE,
+        success="Your password has been updated successfully. You can now log in with your new password.",
+        token=token
+    )
 
 
 @app.route("/logout")
@@ -255,6 +582,8 @@ def register_submit():
         app.logger.error("Failed to create user: %s", email)
         return jsonify(success=False, field="emailInput",
                         message="Could not create account. Please try again."), 500
+
+    send_welcome_email(new_user.get("full_name"), new_user.get("email"))
 
     session["user_id"] = new_user["id"]
     session["full_name"] = new_user["full_name"]

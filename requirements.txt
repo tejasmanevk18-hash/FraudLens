@@ -6,4 +6,5 @@ Werkzeug
 opencv-python
 pyzbar
 mysql-connector-python
+requests
 gunicorn

@@ -5,6 +5,7 @@ Connects to the MySQL database 'fraudlens_new' used by the app.
 All database operations are centralized here for maintainability.
 """
 
+import hashlib
 import os
 import traceback
 
@@ -187,6 +188,171 @@ def get_all_users():
         print(f"Database error in get_all_users: {e}")
         traceback.print_exc()
         return []
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()
+
+
+def ensure_password_reset_tokens_table():
+    """Create the password_reset_tokens table if it does not already exist."""
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                token_hash VARCHAR(255) NOT NULL,
+                expires_at DATETIME NOT NULL,
+                used BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_password_reset_token_hash (token_hash),
+                KEY idx_password_reset_user_id (user_id),
+                CONSTRAINT fk_password_reset_tokens_user
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                    ON DELETE CASCADE
+            ) ENGINE=InnoDB
+            """
+        )
+        conn.commit()
+        return True
+    except DatabaseUnavailableError:
+        raise
+    except MySQLError as e:
+        if conn:
+            conn.rollback()
+        print(f"Database error in ensure_password_reset_tokens_table: {e}")
+        traceback.print_exc()
+        return False
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()
+
+
+def create_password_reset_token(user_id, raw_token, expires_at):
+    """Store a hashed replacement token only."""
+    conn = None
+    cursor = None
+    try:
+        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, used)
+            VALUES (%s, %s, %s, FALSE)
+            """,
+            (user_id, token_hash, expires_at)
+        )
+        conn.commit()
+        return True
+    except DatabaseUnavailableError:
+        raise
+    except MySQLError as e:
+        if conn:
+            conn.rollback()
+        print(f"Database error in create_password_reset_token: {e}")
+        traceback.print_exc()
+        return False
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()
+
+
+def get_password_reset_token_record(raw_token):
+    """Return the active reset-token record for a raw token, if one exists."""
+    conn = None
+    cursor = None
+    try:
+        if not raw_token:
+            return None
+        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT id, user_id, token_hash, expires_at, used, created_at
+            FROM password_reset_tokens
+            WHERE token_hash = %s
+            LIMIT 1
+            """,
+            (token_hash,)
+        )
+        return cursor.fetchone()
+    except DatabaseUnavailableError:
+        raise
+    except MySQLError as e:
+        print(f"Database error in get_password_reset_token_record: {e}")
+        traceback.print_exc()
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()
+
+
+def mark_password_reset_token_used(raw_token):
+    """Mark a reset token as used if it still exists and is valid."""
+    conn = None
+    cursor = None
+    try:
+        if not raw_token:
+            return False
+        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE password_reset_tokens SET used = TRUE WHERE token_hash = %s AND used = FALSE",
+            (token_hash,)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    except DatabaseUnavailableError:
+        raise
+    except MySQLError as e:
+        if conn:
+            conn.rollback()
+        print(f"Database error in mark_password_reset_token_used: {e}")
+        traceback.print_exc()
+        return False
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()
+
+
+def update_user_password(user_id, password_hash):
+    """Update the user's password with a new hashed value."""
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE users SET password = %s WHERE id = %s",
+            (password_hash, user_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    except DatabaseUnavailableError:
+        raise
+    except MySQLError as e:
+        if conn:
+            conn.rollback()
+        print(f"Database error in update_user_password: {e}")
+        traceback.print_exc()
+        return False
     finally:
         if cursor:
             cursor.close()
