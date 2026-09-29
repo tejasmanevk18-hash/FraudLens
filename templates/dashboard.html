@@ -106,7 +106,7 @@
           <div class="feature-icon tone-blue"><i class="bi bi-chat-dots"></i></div>
           <h3>AI SMS Detector</h3>
           <p>Analyze suspicious messages for scam language and phishing patterns.</p>
-          <a href="{{ url_for('sms_detector') }}" class="btn btn-outline-soft btn-sm mt-2">Open</a>
+          <a href="{{ url_for('sms_detector') }}" class="btn btn-primary btn-sm mt-2">Open</a>
         </div>
       </div>
       <div class="col-md-6 col-lg-3">
@@ -114,7 +114,7 @@
           <div class="feature-icon tone-violet"><i class="bi bi-link-45deg"></i></div>
           <h3>Link Checker</h3>
           <p>Check suspicious URLs for phishing and redirect risks before you click.</p>
-          <a href="{{ url_for('link_checker') }}" class="btn btn-outline-soft btn-sm mt-2">Open</a>
+          <a href="{{ url_for('link_checker') }}" class="btn btn-primary btn-sm mt-2">Open</a>
         </div>
       </div>
       <div class="col-md-6 col-lg-3">
@@ -122,7 +122,7 @@
           <div class="feature-icon tone-navy"><i class="bi bi-qr-code-scan"></i></div>
           <h3>QR Safety Scanner</h3>
           <p>Scan QR codes safely and reveal where they actually lead.</p>
-          <a href="{{ url_for('qr_scanner') }}" class="btn btn-outline-soft btn-sm mt-2">Open</a>
+          <a href="{{ url_for('qr_scanner') }}" class="btn btn-primary btn-sm mt-2">Open</a>
         </div>
       </div>
       <div class="col-md-6 col-lg-3">
@@ -130,32 +130,35 @@
           <div class="feature-icon tone-teal"><i class="bi bi-mortarboard"></i></div>
           <h3>Cyber Safety Hub</h3>
           <p>Learn practical, easy-to-follow tips to stay safe online.</p>
-          <a href="{{ url_for('safety_hub') }}" class="btn btn-outline-soft btn-sm mt-2">Open</a>
+          <a href="{{ url_for('safety_hub') }}" class="btn btn-primary btn-sm mt-2">Open</a>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Recent activity -->
+  <!-- Compact scan history -->
   <section class="mt-5">
     <span class="section-label">Activity</span>
-    <h2 class="mt-1 mb-3" style="font-size:1.3rem;">Recent Activity</h2>
-    <div class="fl-card p-3">
-      {% for scan in recent %}
-      <div class="activity-row">
-        <div class="d-flex align-items-center">
-          <span class="activity-icon"><i class="bi {% if scan.scan_type == 'SMS Scan' %}bi-chat-dots{% elif scan.scan_type == 'Link Check' %}bi-link-45deg{% else %}bi-qr-code-scan{% endif %}"></i></span>
-          <div>
-            <div class="fw-semibold" style="font-size:0.92rem;">{{ scan.scan_type }}</div>
-            <div class="text-muted-soft" style="font-size:0.78rem;">{{ scan.created_at }}</div>
+    <h2 class="mt-1 mb-3" style="font-size:1.3rem;">Scan History</h2>
+    <details class="history-panel fl-card p-3">
+      <summary>View Activity</summary>
+      <div class="history-list">
+        {% for scan in recent %}
+        <div class="activity-row">
+          <div class="d-flex align-items-center">
+            <span class="activity-icon"><i class="bi {% if scan.scan_type == 'SMS Scan' %}bi-chat-dots{% elif scan.scan_type == 'Link Check' %}bi-link-45deg{% else %}bi-qr-code-scan{% endif %}"></i></span>
+            <div>
+              <div class="fw-semibold" style="font-size:0.92rem;">{{ scan.scan_type }}</div>
+              <div class="text-muted-soft" style="font-size:0.78rem;">{{ scan.created_at }}</div>
+            </div>
           </div>
+          <span class="status-badge {% if scan.risk_score >= 70 %}danger{% elif scan.risk_score >= 40 %}suspicious{% else %}safe{% endif %}"><i class="bi {% if scan.risk_score >= 40 %}bi-exclamation-triangle{% else %}bi-check-circle{% endif %}"></i>{{ scan.result }}</span>
         </div>
-        <span class="status-badge {% if scan.risk_score >= 70 %}danger{% elif scan.risk_score >= 40 %}suspicious{% else %}safe{% endif %}"><i class="bi {% if scan.risk_score >= 40 %}bi-exclamation-triangle{% else %}bi-check-circle{% endif %}"></i>{{ scan.result }}</span>
+        {% else %}
+        <div class="empty-state py-3"><p class="mb-0 text-muted-soft">No scans yet.</p></div>
+        {% endfor %}
       </div>
-      {% else %}
-      <div class="empty-state py-3"><p class="mb-0 text-muted-soft">No scans yet.</p></div>
-      {% endfor %}
-    </div>
+    </details>
   </section>
 
   <footer class="fl-footer text-center">
