@@ -12,7 +12,9 @@ Run:
 
 import io
 import json
+import html
 import os
+import re
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
@@ -99,7 +101,7 @@ def ensure_password_reset_table():
         app.logger.warning("Password reset table unavailable: %s", exc)
 
 
-def send_brevo_email(to_email, subject, html_content, text_content=None):
+def send_brevo_email(to_email, subject, html_content, text_content=None, reply_to=None):
     if requests is None:
         app.logger.warning("Brevo email not sent because the requests dependency is unavailable.")
         return False
@@ -119,6 +121,8 @@ def send_brevo_email(to_email, subject, html_content, text_content=None):
         "htmlContent": html_content,
         "textContent": text_content or "FraudLens email"
     }
+    if reply_to:
+        payload["replyTo"] = {"email": reply_to}
 
     try:
         response = requests.post(
@@ -236,6 +240,88 @@ def index():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
+
+
+@app.route("/contact", methods=["GET", "POST"])
+def contact():
+    form_data = {"name": "", "email": "", "subject": "", "message": ""}
+    status_message = None
+    status_type = None
+
+    if request.method == "POST":
+        form_data = {
+            key: (request.form.get(key) or "").strip()
+            for key in ("name", "email", "subject", "message")
+        }
+        name = form_data["name"]
+        email_address = form_data["email"]
+        subject = form_data["subject"]
+        message = form_data["message"]
+
+        email_is_valid = (
+            len(email_address) <= 254
+            and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email_address) is not None
+        )
+        has_header_newline = any(
+            "\r" in value or "\n" in value
+            for value in (name, email_address, subject)
+        )
+        if (
+            not name or len(name) > 100
+            or not email_is_valid
+            or not subject or len(subject) > 160
+            or not message or len(message) > 5000
+            or has_header_newline
+        ):
+            status_message = "Please complete all fields with valid information and try again."
+            status_type = "error"
+            return render_template(
+                "contact.html", form_data=form_data,
+                status_message=status_message, status_type=status_type
+            ), 400
+
+        submitted_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        email_subject = f"FraudLens Contact: {subject}"
+        safe_name = html.escape(name)
+        safe_email = html.escape(email_address)
+        safe_subject = html.escape(subject)
+        safe_message = html.escape(message)
+        email_html = f"""
+        <html><body style="font-family:Arial,sans-serif;color:#1f2733;line-height:1.6">
+          <h2>New FraudLens contact message</h2>
+          <p><strong>Name:</strong> {safe_name}</p>
+          <p><strong>Email:</strong> {safe_email}</p>
+          <p><strong>Subject:</strong> {safe_subject}</p>
+          <p><strong>Message:</strong></p>
+          <p style="white-space:pre-wrap">{safe_message}</p>
+          <p><strong>Submitted:</strong> {submitted_at}</p>
+        </body></html>
+        """
+        email_text = (
+            f"Name: {name}\nEmail: {email_address}\nSubject: {subject}\n\n"
+            f"Message:\n{message}\n\nSubmitted: {submitted_at}"
+        )
+        try:
+            sent = send_brevo_email(
+                "fraudlensdetector@gmail.com", email_subject, email_html,
+                text_content=email_text, reply_to=email_address
+            )
+        except Exception:
+            app.logger.exception("Contact message email could not be sent.")
+            sent = False
+
+        if sent:
+            form_data = {"name": "", "email": "", "subject": "", "message": ""}
+            status_message = "Message sent successfully! Thank you for contacting FraudLens. We'll get back to you as soon as possible."
+            status_type = "success"
+        else:
+            status_message = "Unable to send your message right now. Please try again later."
+            status_type = "error"
+
+    return render_template(
+        "contact.html", form_data=form_data,
+        status_message=status_message, status_type=status_type
+    )
 
 
 FORGOT_PASSWORD_TEMPLATE = """

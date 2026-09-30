@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact Us - FraudLens</title>
+<link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg fl-navbar">
+  <div class="container page-shell px-0">
+    <a class="fl-brand navbar-brand" href="{{ url_for('dashboard') if session.get('user_id') else url_for('login') }}">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="FraudLens Logo" class="fl-logo-img">
+      <div class="fl-logo-fallback">FL</div>
+      <div class="fl-brand-text">
+        <span class="fl-brand-name">FraudLens</span>
+        <span class="fl-brand-sub">Scam Detection</span>
+      </div>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMain">
+      <ul class="navbar-nav mx-auto gap-lg-1 mt-3 mt-lg-0">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('sms_detector') }}">SMS Detector</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('link_checker') }}">Link Checker</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('qr_scanner') }}">QR Scanner</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('safety_hub') }}">Cyber Safety Hub</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{{ url_for('contact') }}">Contact Us</a></li>
+      </ul>
+      <div class="d-flex align-items-center gap-3 mt-3 mt-lg-0">
+        {% if session.get('user_id') %}
+        <a class="btn btn-outline-soft btn-sm" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-1"></i>Logout</a>
+        {% else %}
+        <a class="btn btn-outline-soft btn-sm" href="{{ url_for('login') }}">Login</a>
+        <a class="btn btn-primary btn-sm" href="{{ url_for('register') }}">Register</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="page-shell contact-page">
+  <header class="contact-page-header fade-in">
+    <span class="section-label">Contact</span>
+    <h1 class="mt-2" style="font-size:1.9rem;">We're here to help</h1>
+    <p class="text-muted-soft mb-0">Questions, feedback, technical issues, or suggestions: reach out to the FraudLens team.</p>
+  </header>
+
+  <div class="contact-layout">
+    <section class="contact-info-panel" aria-labelledby="contactInfoTitle">
+      <div class="contact-decoration" aria-hidden="true"></div>
+      <span class="section-label" style="color:#9CC0FD;">FraudLens Support</span>
+      <h2 id="contactInfoTitle" class="mt-2">Get in Touch</h2>
+      <p class="contact-info-copy">Have a question, feedback, technical issue, or suggestion? Get in touch with the FraudLens team.</p>
+
+      <div class="contact-detail">
+        <span class="contact-detail-icon"><i class="bi bi-envelope" aria-hidden="true"></i></span>
+        <div>
+          <span class="contact-detail-label">Email</span>
+          <a href="mailto:fraudlensdetector@gmail.com">fraudlensdetector@gmail.com</a>
+        </div>
+      </div>
+      <div class="contact-detail">
+        <span class="contact-detail-icon"><i class="bi bi-chat-square-text" aria-hidden="true"></i></span>
+        <div>
+          <span class="contact-detail-label">Response</span>
+          <span>We'll get back to you as soon as possible.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="fl-card contact-form-card" aria-labelledby="contactFormTitle">
+      <h2 id="contactFormTitle" class="mb-1">Send us a message</h2>
+      <p class="text-muted-soft mb-4">Share a few details and we'll be in touch.</p>
+
+      {% if status_message %}
+      <div class="alert alert-{{ 'success' if status_type == 'success' else 'danger' }} contact-alert" role="status" aria-live="polite">{{ status_message }}</div>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('contact') }}" id="contactForm">
+        <div class="mb-3">
+          <label class="form-label" for="contactName">Full Name</label>
+          <input class="form-control" type="text" id="contactName" name="name" placeholder="Enter your full name" maxlength="100" autocomplete="name" value="{{ form_data.name }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="contactEmail">Email Address</label>
+          <input class="form-control" type="email" id="contactEmail" name="email" placeholder="Enter your email address" maxlength="254" autocomplete="email" value="{{ form_data.email }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="contactSubject">Subject</label>
+          <input class="form-control" type="text" id="contactSubject" name="subject" placeholder="Enter subject" maxlength="160" value="{{ form_data.subject }}" required>
+        </div>
+        <div class="mb-4">
+          <label class="form-label" for="contactMessage">Message</label>
+          <textarea class="form-control" id="contactMessage" name="message" rows="5" maxlength="5000" placeholder="Write your message here..." required>{{ form_data.message }}</textarea>
+        </div>
+        <button class="btn btn-primary contact-submit w-100" type="submit" id="contactSubmit">
+          <span class="contact-submit-label"><i class="bi bi-send me-2" aria-hidden="true"></i>Send Message</span>
+          <span class="contact-submit-loading d-none"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Sending...</span>
+        </button>
+      </form>
+    </section>
+  </div>
+
+  <footer class="fl-footer text-center">FraudLens - AI Powered Scam Detection System 2026</footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  document.getElementById('contactForm').addEventListener('submit', function () {
+    const button = document.getElementById('contactSubmit');
+    button.disabled = true;
+    button.querySelector('.contact-submit-label').classList.add('d-none');
+    button.querySelector('.contact-submit-loading').classList.remove('d-none');
+  });
+</script>
+</body>
+</html>
