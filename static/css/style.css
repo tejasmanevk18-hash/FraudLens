@@ -254,6 +254,8 @@ a { text-decoration: none; }
   overflow: hidden;
 }
 
+.auth-footer-note { font-size: 0.75rem; }
+
 /* Signature scan-ring motif */
 .scan-ring {
   position: absolute;
@@ -1931,10 +1933,6 @@ a { text-decoration: none; }
   color: var(--accent-color);
 }
 
-.safety-hub-page .fl-footer {
-  margin-top: 2rem;
-}
-
 .safety-hub-page .safety-card {
   padding: 1.5rem;
   height: 100%;
@@ -2070,6 +2068,22 @@ a { text-decoration: none; }
    Utility / layout
 ========================================================= */
 .page-shell { max-width: 1180px; margin: 0 auto; padding: 0 1.25rem 3rem; }
+body:has(> .page-shell > .fl-footer) {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+body:has(> .page-shell > .fl-footer) > .page-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 1rem;
+}
+.fl-footer {
+  margin-top: auto;
+  padding-top: 2rem;
+  font-size: 0.82rem;
+}
 .fade-in { animation: fadeUp 480ms ease both; }
 
 /* Reduced motion */
