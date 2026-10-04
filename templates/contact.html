@@ -131,6 +131,24 @@
     </section>
   </div>
 
+  <section class="fl-card app-rating-card" aria-labelledby="appRatingTitle" data-csrf-token="{{ rating_csrf_token }}" data-submit-url="{{ url_for('submit_rating') }}">
+    <h2 id="appRatingTitle" class="mb-1">Rate the App</h2>
+    <p class="text-muted-soft mb-3">How was your experience with FraudLens?</p>
+    <div class="app-rating-stars" role="group" aria-label="Choose a rating from 1 to 5 stars">
+      {% for rating in range(1, 6) %}
+      <button class="app-rating-star" type="button" data-rating="{{ rating }}" aria-label="{{ rating }} out of 5 stars" aria-pressed="false">
+        <i class="bi bi-star-fill" aria-hidden="true"></i>
+      </button>
+      {% endfor %}
+    </div>
+    <p class="app-rating-selection text-muted-soft mb-3" aria-live="polite">Select a star rating</p>
+    <button class="btn btn-primary app-rating-submit" type="button" disabled>
+      <span class="app-rating-submit-label"><i class="bi bi-star me-2" aria-hidden="true"></i>Submit Rating</span>
+      <span class="app-rating-submit-loading d-none"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Submitting...</span>
+    </button>
+    <div class="app-rating-status mt-3" role="status" aria-live="polite"></div>
+  </section>
+
   <footer class="fl-footer text-center">FraudLens - AI Powered Scam Detection System 2026</footer>
 </div>
   </main>
@@ -139,6 +157,89 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 <script>
+  const ratingSection = document.querySelector('.app-rating-card');
+  const ratingStars = Array.from(ratingSection.querySelectorAll('.app-rating-star'));
+  const ratingSubmit = ratingSection.querySelector('.app-rating-submit');
+  const ratingSelection = ratingSection.querySelector('.app-rating-selection');
+  const ratingStatus = ratingSection.querySelector('.app-rating-status');
+  let selectedRating = 0;
+  let hoverRating = 0;
+
+  function renderRating() {
+    const displayedRating = hoverRating || selectedRating;
+    ratingStars.forEach((star, index) => {
+      const isActive = index < displayedRating;
+      star.classList.toggle('is-active', isActive);
+      star.setAttribute('aria-pressed', String(index + 1 === selectedRating));
+    });
+    ratingSelection.textContent = selectedRating
+      ? `${selectedRating} out of 5 stars selected`
+      : 'Select a star rating';
+    ratingSubmit.disabled = selectedRating === 0;
+  }
+
+  ratingStars.forEach((star) => {
+    const rating = Number(star.dataset.rating);
+    star.addEventListener('click', () => {
+      selectedRating = rating;
+      ratingStatus.replaceChildren();
+      renderRating();
+    });
+    star.addEventListener('pointerenter', () => {
+      hoverRating = rating;
+      renderRating();
+    });
+    star.addEventListener('focus', () => {
+      hoverRating = rating;
+      renderRating();
+    });
+    star.addEventListener('blur', () => {
+      hoverRating = 0;
+      renderRating();
+    });
+  });
+
+  ratingSection.querySelector('.app-rating-stars').addEventListener('pointerleave', () => {
+    hoverRating = 0;
+    renderRating();
+  });
+
+  ratingSubmit.addEventListener('click', async () => {
+    if (!selectedRating || ratingSubmit.disabled) return;
+    ratingSubmit.disabled = true;
+    ratingSubmit.querySelector('.app-rating-submit-label').classList.add('d-none');
+    ratingSubmit.querySelector('.app-rating-submit-loading').classList.remove('d-none');
+    ratingStatus.replaceChildren();
+
+    try {
+      const response = await fetch(ratingSection.dataset.submitUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': ratingSection.dataset.csrfToken
+        },
+        body: JSON.stringify({ rating: selectedRating })
+      });
+      const result = await response.json();
+      const message = document.createElement('div');
+      message.className = `alert alert-${response.ok && result.success ? 'success' : 'danger'} contact-alert mb-0`;
+      message.textContent = response.ok && result.success
+        ? result.message
+        : (result.message || "We couldn't send your rating right now. Please try again.");
+      ratingStatus.append(message);
+    } catch (error) {
+      const message = document.createElement('div');
+      message.className = 'alert alert-danger contact-alert mb-0';
+      message.textContent = "We couldn't send your rating right now. Please try again.";
+      ratingStatus.append(message);
+    } finally {
+      ratingSubmit.querySelector('.app-rating-submit-label').classList.remove('d-none');
+      ratingSubmit.querySelector('.app-rating-submit-loading').classList.add('d-none');
+      ratingSubmit.disabled = selectedRating === 0;
+    }
+  });
+
   document.getElementById('contactForm').addEventListener('submit', function () {
     const button = document.getElementById('contactSubmit');
     button.disabled = true;

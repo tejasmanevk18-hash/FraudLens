@@ -2467,8 +2467,34 @@ body:has(> .page-shell > .fl-footer) > .page-shell {
 .contact-submit { min-height: 48px; }
 .contact-submit:disabled { opacity: 0.78; cursor: wait; }
 .contact-alert { border-radius: var(--radius-sm); }
+.app-rating-card { margin-top: 1.25rem; padding: 1.5rem 2rem; }
+.app-rating-card h2 { font-size: 1.3rem; }
+.app-rating-stars { display: flex; gap: 0.35rem; width: fit-content; }
+.app-rating-star {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--muted-color);
+  background: transparent;
+  font-size: 1.55rem;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+.app-rating-star:hover, .app-rating-star:focus-visible { background: rgba(47,111,237,0.08); }
+.app-rating-star.is-active { color: #e5a900; }
+.app-rating-star:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+.app-rating-selection { min-height: 1.5rem; }
+.app-rating-submit { min-height: 44px; }
+.app-rating-submit:disabled { opacity: 0.65; cursor: not-allowed; }
+.app-rating-status:empty { display: none; }
 @media (max-width: 767.98px) {
   .contact-page { margin-top: 1.5rem; }
   .contact-layout { grid-template-columns: 1fr; }
   .contact-info-panel, .contact-form-card { padding: 1.4rem; }
+  .app-rating-card { padding: 1.4rem; }
+  .app-rating-stars { gap: 0.2rem; }
+  .app-rating-star { width: 40px; height: 40px; }
 }

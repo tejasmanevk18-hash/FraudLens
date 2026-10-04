@@ -13,6 +13,7 @@ Run:
 import io
 import json
 import html
+import hmac
 import os
 import re
 import secrets
@@ -247,6 +248,10 @@ def contact():
     form_data = {"name": "", "email": "", "subject": "", "message": ""}
     status_message = None
     status_type = None
+    rating_csrf_token = session.get("rating_csrf_token")
+    if not rating_csrf_token:
+        rating_csrf_token = secrets.token_urlsafe(32)
+        session["rating_csrf_token"] = rating_csrf_token
 
     if request.method == "POST":
         form_data = {
@@ -278,7 +283,7 @@ def contact():
             return render_template(
                 "contact.html", form_data=form_data,
                 status_message=status_message, status_type=status_type,
-                user=current_user_from_session()
+                user=current_user_from_session(), rating_csrf_token=rating_csrf_token
             ), 400
 
         submitted_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
@@ -322,8 +327,55 @@ def contact():
     return render_template(
         "contact.html", form_data=form_data,
         status_message=status_message, status_type=status_type,
-        user=current_user_from_session()
+        user=current_user_from_session(), rating_csrf_token=rating_csrf_token
     )
+
+
+@app.route("/api/submit-rating", methods=["POST"])
+def submit_rating():
+    csrf_token = session.get("rating_csrf_token", "")
+    submitted_token = request.headers.get("X-CSRF-Token", "")
+    if not csrf_token or not hmac.compare_digest(csrf_token, submitted_token):
+        return jsonify(success=False, message="Please refresh the page and try again."), 403
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(success=False, message="Please select a rating from 1 to 5 stars."), 400
+
+    rating = data.get("rating")
+    if type(rating) is not int or not 1 <= rating <= 5:
+        return jsonify(success=False, message="Please select a rating from 1 to 5 stars."), 400
+
+    stars = "⭐" * rating + "☆" * (5 - rating)
+    email_subject = "New FraudLens App Rating Received"
+    email_text = (
+        "New app rating received!\n\n"
+        "Application: FraudLens - AI Powered Scam Detection System 2026\n"
+        f"Rating: {rating} out of 5 stars\n"
+        f"Rating: {stars}\n\n"
+        "A user has submitted a rating for the FraudLens application."
+    )
+    email_html = f"""
+    <html><body style="font-family:Arial,sans-serif;color:#1f2733;line-height:1.6">
+      <h2>New app rating received!</h2>
+      <p><strong>Application:</strong> FraudLens - AI Powered Scam Detection System 2026</p>
+      <p><strong>Rating:</strong> {rating} out of 5 stars</p>
+      <p><strong>Rating:</strong> {stars}</p>
+      <p>A user has submitted a rating for the FraudLens application.</p>
+    </body></html>
+    """
+    try:
+        sent = send_brevo_email(
+            "fraudlensdetector@gmail.com", email_subject, email_html,
+            text_content=email_text
+        )
+    except Exception:
+        app.logger.exception("App rating notification could not be sent.")
+        sent = False
+
+    if not sent:
+        return jsonify(success=False, message="We couldn't send your rating right now. Please try again."), 503
+    return jsonify(success=True, message="Thank you for rating FraudLens!"), 200
 
 
 FORGOT_PASSWORD_TEMPLATE = """
