@@ -1150,6 +1150,7 @@
     let hasScan = false;
     let cameraDevices = [];
     let activeDeviceIndex = 0;
+    let activeDeviceId = '';
     let switchingInProgress = false;
     let nativeDetector = null;
     if ('BarcodeDetector' in window) {
@@ -1212,7 +1213,12 @@
       }
 
       if (cameraDevices.length > 0) {
-        activeDeviceIndex = Math.min(activeDeviceIndex, cameraDevices.length - 1);
+        const activeIndex = activeDeviceId
+          ? cameraDevices.findIndex(device => device.deviceId === activeDeviceId)
+          : -1;
+        activeDeviceIndex = activeIndex >= 0
+          ? activeIndex
+          : Math.min(activeDeviceIndex, cameraDevices.length - 1);
       }
       updateCameraSwitchButton();
       return cameraDevices;
@@ -1356,12 +1362,17 @@
         }
 
         const safeIndex = Math.max(0, Math.min(deviceIndex, cameraDevices.length - 1));
-        activeDeviceIndex = safeIndex;
         stopStreamTracks();
 
-        stream = await navigator.mediaDevices.getUserMedia(buildCameraConstraints(safeIndex));
-        video.srcObject = stream;
+        const newStream = await navigator.mediaDevices.getUserMedia(buildCameraConstraints(safeIndex));
+        stream = newStream;
+        video.srcObject = newStream;
         await video.play();
+        activeDeviceIndex = safeIndex;
+        activeDeviceId = newStream.getVideoTracks()[0]?.getSettings?.().deviceId
+          || cameraDevices[safeIndex]?.deviceId
+          || '';
+        await detectAvailableCameras();
         video.hidden = false;
         startBtn.hidden = true;
         stopBtn.hidden = false;
@@ -1385,21 +1396,65 @@
     async function switchCamera() {
       if (switchingInProgress || !navigator.mediaDevices?.getUserMedia) return;
 
+      switchingInProgress = true;
+      updateCameraSwitchButton();
+      await detectAvailableCameras();
       if (cameraDevices.length < 2) {
+        switchingInProgress = false;
+        updateCameraSwitchButton();
         showToast('Only one camera is available on this device.', 'error');
         return;
       }
 
-      switchingInProgress = true;
-      updateCameraSwitchButton();
-      const nextIndex = (activeDeviceIndex + 1) % cameraDevices.length;
+      const previousDeviceId = activeDeviceId
+        || stream?.getVideoTracks()[0]?.getSettings?.().deviceId
+        || cameraDevices[activeDeviceIndex]?.deviceId
+        || '';
+      const currentIndex = previousDeviceId
+        ? cameraDevices.findIndex(device => device.deviceId === previousDeviceId)
+        : activeDeviceIndex;
+      const nextIndex = ((currentIndex >= 0 ? currentIndex : activeDeviceIndex) + 1) % cameraDevices.length;
+      const previousIndex = currentIndex >= 0 ? currentIndex : activeDeviceIndex;
       setStatus('Switching to the next available camera…', 'bi-camera-reels');
 
       try {
-        await startCamera(nextIndex);
+        stopStreamTracks();
+        const nextStream = await navigator.mediaDevices.getUserMedia(buildCameraConstraints(nextIndex));
+        stream = nextStream;
+        video.srcObject = nextStream;
+        await video.play();
+        activeDeviceIndex = nextIndex;
+        activeDeviceId = nextStream.getVideoTracks()[0]?.getSettings?.().deviceId
+          || cameraDevices[nextIndex]?.deviceId
+          || '';
+        video.hidden = false;
+        startBtn.hidden = true;
+        stopBtn.hidden = false;
+        scanFrame();
         showToast('Camera switched successfully.', 'success');
         setStatus('Camera switched. Scanning the selected device feed…', 'bi-camera-video');
       } catch (error) {
+        stopStreamTracks();
+        try {
+          const previousDevice = cameraDevices[previousIndex];
+          const restoreConstraints = previousDevice?.deviceId
+            ? { video: { deviceId: { exact: previousDevice.deviceId } }, audio: false }
+            : buildCameraConstraints(previousIndex);
+          const restoredStream = await navigator.mediaDevices.getUserMedia(restoreConstraints);
+          stream = restoredStream;
+          video.srcObject = restoredStream;
+          await video.play();
+          activeDeviceIndex = previousIndex;
+          activeDeviceId = restoredStream.getVideoTracks()[0]?.getSettings?.().deviceId
+            || previousDevice?.deviceId
+            || '';
+          video.hidden = false;
+          startBtn.hidden = true;
+          stopBtn.hidden = false;
+          scanFrame();
+        } catch (restoreError) {
+          stopCamera({ keepButtons: true, statusMessage: 'Camera unavailable or permission denied.' });
+        }
         const message = error.name === 'NotAllowedError'
           ? 'Camera permission was denied while switching.'
           : 'Unable to switch cameras.';
