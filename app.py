@@ -277,7 +277,8 @@ def contact():
             status_type = "error"
             return render_template(
                 "contact.html", form_data=form_data,
-                status_message=status_message, status_type=status_type
+                status_message=status_message, status_type=status_type,
+                user=current_user_from_session()
             ), 400
 
         submitted_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
@@ -320,7 +321,8 @@ def contact():
 
     return render_template(
         "contact.html", form_data=form_data,
-        status_message=status_message, status_type=status_type
+        status_message=status_message, status_type=status_type,
+        user=current_user_from_session()
     )
 
 

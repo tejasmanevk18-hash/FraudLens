@@ -583,6 +583,7 @@
       'qr_scanner',
       'safety_hub'
     ];
+    const profilePages = ['contact'];
 
     let current = window.location.pathname.split('/').pop();
     if (!current) current = 'index';
@@ -590,19 +591,19 @@
       current = current.replace(/\.html$/i, '');
     }
 
-    if (!guardedPages.includes(current)) return null;
+    if (!guardedPages.includes(current) && !profilePages.includes(current)) return null;
 
     try {
       const resp = await fetch('/api/whoami', { credentials: 'same-origin' });
       const data = await resp.json().catch(() => ({}));
       if (!data.logged_in) {
-        window.location.href = '/login';
+        if (guardedPages.includes(current)) window.location.href = '/login';
         return null;
       }
       return data.user || null;
     } catch (e) {
       // On network error, fall back to redirect to login to be safe
-      window.location.href = '/login';
+      if (guardedPages.includes(current)) window.location.href = '/login';
       return null;
     }
   }
