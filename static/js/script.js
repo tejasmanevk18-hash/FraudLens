@@ -656,6 +656,39 @@
     modal.classList.add('is-open');
   }
 
+  function initSidebar() {
+    const sidebar = document.querySelector('.fl-sidebar');
+    const toggle = document.querySelector('.fl-sidebar-toggle');
+    const backdrop = document.querySelector('.fl-sidebar-backdrop');
+
+    if (!sidebar || !toggle) return;
+
+    const closeSidebar = () => {
+      sidebar.classList.remove('is-open');
+      if (backdrop) backdrop.classList.remove('is-visible');
+    };
+
+    toggle.addEventListener('click', () => {
+      const isOpen = sidebar.classList.toggle('is-open');
+      if (backdrop) {
+        backdrop.classList.toggle('is-visible', isOpen);
+        backdrop.style.display = isOpen ? 'block' : 'none';
+      }
+    });
+
+    if (backdrop) {
+      backdrop.addEventListener('click', closeSidebar);
+    }
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeSidebar();
+    });
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 991) closeSidebar();
+    });
+  }
+
   function initLogoutButtons() {
     document
       .querySelectorAll('[data-logout]')
@@ -1094,6 +1127,7 @@
   function initQrScanner() {
     const preview = document.getElementById('qrPreviewFrame');
     const startBtn = document.getElementById('startQrCameraBtn');
+    const switchBtn = document.getElementById('switchQrCameraBtn');
     const stopBtn = document.getElementById('stopQrCameraBtn');
     const clearBtn = document.getElementById('clearQrScanBtn');
     const status = document.getElementById('qrScanStatus');
@@ -1114,6 +1148,9 @@
     let scanTimer = null;
     let scanInProgress = false;
     let hasScan = false;
+    let cameraDevices = [];
+    let activeDeviceIndex = 0;
+    let switchingInProgress = false;
     let nativeDetector = null;
     if ('BarcodeDetector' in window) {
       try {
@@ -1127,18 +1164,88 @@
       if (status) status.innerHTML = `<i class="bi ${icon}"></i><span>${escapeHTML(message)}</span>`;
     }
 
-    function stopCamera() {
+    function updateCameraSwitchButton() {
+      if (!switchBtn) return;
+      const hasMultipleCameras = cameraDevices.length > 1;
+      switchBtn.disabled = !hasMultipleCameras || switchingInProgress;
+      switchBtn.title = hasMultipleCameras ? 'Switch to the next available camera' : 'Only one camera is available';
+      switchBtn.setAttribute('aria-label', hasMultipleCameras ? 'Switch camera' : 'Switch camera unavailable');
+    }
+
+    function stopStreamTracks() {
       if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
-      if (stream) stream.getTracks().forEach(track => track.stop());
-      stream = null;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
       video.pause();
       video.srcObject = null;
-      video.hidden = true;
-      startBtn.hidden = false;
-      stopBtn.hidden = true;
       scanInProgress = false;
       loading?.classList.remove('active');
-      if (!hasScan) setStatus('Camera is off. Start scanning when you are ready.');
+    }
+
+    function stopCamera({ keepButtons = false, statusMessage = 'Camera is off. Start scanning when you are ready.' } = {}) {
+      stopStreamTracks();
+      video.hidden = true;
+      if (!keepButtons) {
+        startBtn.hidden = false;
+        stopBtn.hidden = true;
+      }
+      if (switchBtn) {
+        switchBtn.disabled = true;
+      }
+      if (!hasScan) setStatus(statusMessage);
+    }
+
+    async function detectAvailableCameras() {
+      if (!navigator.mediaDevices?.enumerateDevices) {
+        cameraDevices = [];
+        updateCameraSwitchButton();
+        return [];
+      }
+
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        cameraDevices = devices.filter(device => device.kind === 'videoinput');
+      } catch (error) {
+        cameraDevices = [];
+      }
+
+      if (cameraDevices.length > 0) {
+        activeDeviceIndex = Math.min(activeDeviceIndex, cameraDevices.length - 1);
+      }
+      updateCameraSwitchButton();
+      return cameraDevices;
+    }
+
+    function buildCameraConstraints(deviceIndex) {
+      const device = cameraDevices[deviceIndex];
+      const videoOptions = {
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      };
+
+      if (device && device.deviceId) {
+        return {
+          video: {
+            ...videoOptions,
+            deviceId: { exact: device.deviceId }
+          },
+          audio: false
+        };
+      }
+
+      if (deviceIndex % 2 === 0) {
+        return {
+          video: { ...videoOptions, facingMode: { ideal: 'environment' } },
+          audio: false
+        };
+      }
+
+      return {
+        video: { ...videoOptions, facingMode: { ideal: 'user' } },
+        audio: false
+      };
     }
 
     async function scanFrame() {
@@ -1163,13 +1270,13 @@
               hasScan = true;
               clearBtn.hidden = false;
               setStatus('QR code detected. Camera stopped.', 'bi-check-circle');
-              stopCamera();
+              stopCamera({ keepButtons: true, statusMessage: 'Camera stopped. Start again to scan another code.' });
               scanInProgress = false;
               return;
             }
           }
         } catch (error) {
-          // Use the server decoder when the browser detector is unavailable.
+          // Fall back to the JS decoder below.
         }
       }
 
@@ -1185,7 +1292,7 @@
               hasScan = true;
               clearBtn.hidden = false;
               setStatus('QR code detected. Camera stopped.', 'bi-check-circle');
-              stopCamera();
+              stopCamera({ keepButtons: true, statusMessage: 'Camera stopped. Start again to scan another code.' });
               scanInProgress = false;
               return;
             }
@@ -1205,7 +1312,7 @@
             hasScan = true;
             clearBtn.hidden = false;
             setStatus('QR code detected. Camera stopped.', 'bi-check-circle');
-            stopCamera();
+            stopCamera({ keepButtons: true, statusMessage: 'Camera stopped. Start again to scan another code.' });
           }
         }
         scanInProgress = false;
@@ -1232,42 +1339,94 @@
       return false;
     }
 
-    async function startCamera() {
+    async function startCamera(deviceIndex = activeDeviceIndex) {
       if (!navigator.mediaDevices?.getUserMedia) {
         showToast('Camera is not supported in this browser.', 'error');
         return;
       }
+
+      if (switchingInProgress && stream) return;
+
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+        await detectAvailableCameras();
+
+        if (cameraDevices.length === 0) {
+          showToast('No camera is available on this device.', 'error');
+          return;
+        }
+
+        const safeIndex = Math.max(0, Math.min(deviceIndex, cameraDevices.length - 1));
+        activeDeviceIndex = safeIndex;
+        stopStreamTracks();
+
+        stream = await navigator.mediaDevices.getUserMedia(buildCameraConstraints(safeIndex));
         video.srcObject = stream;
         await video.play();
         video.hidden = false;
         startBtn.hidden = true;
         stopBtn.hidden = false;
+        if (switchBtn) {
+          switchBtn.disabled = cameraDevices.length < 2 || switchingInProgress;
+        }
         setStatus('Scanning live camera feed for a QR code…', 'bi-broadcast');
         scanFrame();
       } catch (error) {
-        stopCamera();
-        const message = error.name === 'NotAllowedError' ? 'Camera permission was denied.' : error.name === 'NotFoundError' ? 'No camera was found on this device.' : 'Unable to start the camera.';
+        stopCamera({ keepButtons: true, statusMessage: 'Camera unavailable or permission denied.' });
+        const message = error.name === 'NotAllowedError'
+          ? 'Camera permission was denied.'
+          : error.name === 'NotFoundError'
+          ? 'No camera was found on this device.'
+          : 'Unable to start the camera.';
         setStatus(message, 'bi-exclamation-circle');
         showToast(message, 'error');
       }
     }
 
-    startBtn.addEventListener('click', startCamera);
+    async function switchCamera() {
+      if (switchingInProgress || !navigator.mediaDevices?.getUserMedia) return;
+
+      if (cameraDevices.length < 2) {
+        showToast('Only one camera is available on this device.', 'error');
+        return;
+      }
+
+      switchingInProgress = true;
+      updateCameraSwitchButton();
+      const nextIndex = (activeDeviceIndex + 1) % cameraDevices.length;
+      setStatus('Switching to the next available camera…', 'bi-camera-reels');
+
+      try {
+        await startCamera(nextIndex);
+        showToast('Camera switched successfully.', 'success');
+        setStatus('Camera switched. Scanning the selected device feed…', 'bi-camera-video');
+      } catch (error) {
+        const message = error.name === 'NotAllowedError'
+          ? 'Camera permission was denied while switching.'
+          : 'Unable to switch cameras.';
+        setStatus(message, 'bi-exclamation-circle');
+        showToast(message, 'error');
+      } finally {
+        switchingInProgress = false;
+        updateCameraSwitchButton();
+      }
+    }
+
+    startBtn.addEventListener('click', () => startCamera(activeDeviceIndex));
+    switchBtn?.addEventListener('click', switchCamera);
     stopBtn.addEventListener('click', () => {
-      stopCamera();
+      stopCamera({ statusMessage: 'Camera stopped. Start again to scan another code.' });
       setStatus('Camera stopped. Start again to scan another code.', 'bi-stop-circle');
     });
     clearBtn.addEventListener('click', () => {
-      stopCamera();
+      stopCamera({ statusMessage: 'Scan cleared. Start the camera to scan another QR code.' });
       hasScan = false;
       resultCard.classList.add('hidden-result');
       clearBtn.hidden = true;
       preview.querySelector('img')?.remove();
       setStatus('Scan cleared. Start the camera to scan another QR code.', 'bi-arrow-counterclockwise');
     });
-    window.addEventListener('beforeunload', stopCamera, { once: true });
+    window.addEventListener('beforeunload', () => stopCamera({ keepButtons: true }), { once: true });
+    updateCameraSwitchButton();
   }
 
   // Top-level server scan function used by upload and camera fallback
@@ -1445,6 +1604,8 @@
     if (document.getElementById('linkInput')) {
       initLinkChecker();
     }
+
+    initSidebar();
 
     if (document.getElementById('qrPreviewFrame')) {
       initQrScanner();
