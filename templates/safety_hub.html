@@ -42,14 +42,11 @@
       </div>
 
       <div class="fl-sidebar-footer">
-        <div class="fl-user-panel">
-          <div class="fl-user-avatar-stack">{{ (user.full_name[:2].upper()) if user and user.full_name else 'FL' }}</div>
-          <div class="fl-user-meta">
-            <strong>{{ user.full_name if user and user.full_name else 'User' }}</strong>
-            <span>{{ user.email if user and user.email else 'user@example.com' }}</span>
-          </div>
-        </div>
-        <button type="button" class="btn btn-outline-soft w-100" data-logout>
+        <button type="button" class="fl-user-chip w-100 text-start" id="userChip" aria-label="Open My Profile" title="My Profile">
+          <span class="fl-user-avatar">{{ (user.full_name[:2].upper()) if user and user.full_name else 'FL' }}</span>
+          <span>{{ user.full_name if user and user.full_name else 'User' }}</span>
+        </button>
+        <button type="button" class="btn btn-outline-soft w-100 mt-2" data-logout>
           <i class="bi bi-box-arrow-right me-1"></i>Logout
         </button>
       </div>
