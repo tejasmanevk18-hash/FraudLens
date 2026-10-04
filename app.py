@@ -346,22 +346,53 @@ def submit_rating():
     if type(rating) is not int or not 1 <= rating <= 5:
         return jsonify(success=False, message="Please select a rating from 1 to 5 stars."), 400
 
+    user = current_user_from_session()
+    if user:
+        user_name = (user.get("full_name") or "").strip() or "Anonymous user"
+        user_email = (user.get("email") or "").strip() or "Not provided"
+    else:
+        user_name = data.get("name", "")
+        user_email = data.get("email", "")
+        if not isinstance(user_name, str) or not isinstance(user_email, str):
+            return jsonify(success=False, message="Please enter valid contact details."), 400
+        user_name = user_name.strip()
+        user_email = user_email.strip()
+        if (
+            len(user_name) > 100
+            or len(user_email) > 254
+            or (user_email and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", user_email) is None)
+        ):
+            return jsonify(success=False, message="Please enter valid contact details."), 400
+        user_name = user_name or "Anonymous user"
+        user_email = user_email or "Not provided"
+
+    feedback = data.get("feedback", "")
+    if not isinstance(feedback, str) or len(feedback) > 5000:
+        return jsonify(success=False, message="Feedback must be 5000 characters or fewer."), 400
+    feedback = feedback.strip() or "No feedback provided"
+
     stars = "⭐" * rating + "☆" * (5 - rating)
-    email_subject = "New FraudLens App Rating Received"
+    submitted_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    email_subject = f"New FraudLens Rating — {rating}/5 Stars"
     email_text = (
-        "New app rating received!\n\n"
-        "Application: FraudLens - AI Powered Scam Detection System 2026\n"
-        f"Rating: {rating} out of 5 stars\n"
-        f"Rating: {stars}\n\n"
-        "A user has submitted a rating for the FraudLens application."
+        "New FraudLens App Rating Received\n\n"
+        f"Rating: {stars} ({rating}/5)\n"
+        f"Submitted By: {user_name}\n"
+        f"User Email: {user_email}\n"
+        f"Feedback: {feedback}\n"
+        f"Submitted At: {submitted_at}"
     )
+    safe_user_name = html.escape(user_name)
+    safe_user_email = html.escape(user_email)
+    safe_feedback = html.escape(feedback)
     email_html = f"""
     <html><body style="font-family:Arial,sans-serif;color:#1f2733;line-height:1.6">
-      <h2>New app rating received!</h2>
-      <p><strong>Application:</strong> FraudLens - AI Powered Scam Detection System 2026</p>
-      <p><strong>Rating:</strong> {rating} out of 5 stars</p>
-      <p><strong>Rating:</strong> {stars}</p>
-      <p>A user has submitted a rating for the FraudLens application.</p>
+      <h2>New FraudLens App Rating Received</h2>
+      <p><strong>Rating:</strong> {stars} ({rating}/5)</p>
+      <p><strong>Submitted By:</strong> {safe_user_name}</p>
+      <p><strong>User Email:</strong> {safe_user_email}</p>
+      <p><strong>Feedback:</strong> {safe_feedback}</p>
+      <p><strong>Submitted At:</strong> {submitted_at}</p>
     </body></html>
     """
     try:

@@ -142,6 +142,18 @@
       {% endfor %}
     </div>
     <p class="app-rating-selection text-muted-soft mb-3" aria-live="polite">Select a star rating</p>
+    <div class="mb-3">
+      <label class="form-label" for="ratingFeedback">Feedback <span class="text-muted-soft">(optional)</span></label>
+      <textarea class="form-control" id="ratingFeedback" rows="3" maxlength="5000" placeholder="Share any thoughts about your experience..."></textarea>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="ratingName">Name <span class="text-muted-soft">(optional)</span></label>
+      <input class="form-control" type="text" id="ratingName" maxlength="100" autocomplete="name" placeholder="Your name">
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="ratingEmail">Email <span class="text-muted-soft">(optional)</span></label>
+      <input class="form-control" type="email" id="ratingEmail" maxlength="254" autocomplete="email" placeholder="you@example.com">
+    </div>
     <button class="btn btn-primary app-rating-submit" type="button" disabled>
       <span class="app-rating-submit-label"><i class="bi bi-star me-2" aria-hidden="true"></i>Submit Rating</span>
       <span class="app-rating-submit-loading d-none"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Submitting...</span>
@@ -219,7 +231,12 @@
           'Content-Type': 'application/json',
           'X-CSRF-Token': ratingSection.dataset.csrfToken
         },
-        body: JSON.stringify({ rating: selectedRating })
+        body: JSON.stringify({
+          rating: selectedRating,
+          feedback: ratingSection.querySelector('#ratingFeedback').value,
+          name: ratingSection.querySelector('#ratingName').value,
+          email: ratingSection.querySelector('#ratingEmail').value
+        })
       });
       const result = await response.json();
       const message = document.createElement('div');
