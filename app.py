@@ -349,49 +349,29 @@ def submit_rating():
     user = current_user_from_session()
     if user:
         user_name = (user.get("full_name") or "").strip() or "Anonymous user"
-        user_email = (user.get("email") or "").strip() or "Not provided"
+        user_email = (user.get("email") or "").strip() or "Not available"
     else:
-        user_name = data.get("name", "")
-        user_email = data.get("email", "")
-        if not isinstance(user_name, str) or not isinstance(user_email, str):
-            return jsonify(success=False, message="Please enter valid contact details."), 400
-        user_name = user_name.strip()
-        user_email = user_email.strip()
-        if (
-            len(user_name) > 100
-            or len(user_email) > 254
-            or (user_email and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", user_email) is None)
-        ):
-            return jsonify(success=False, message="Please enter valid contact details."), 400
-        user_name = user_name or "Anonymous user"
-        user_email = user_email or "Not provided"
-
-    feedback = data.get("feedback", "")
-    if not isinstance(feedback, str) or len(feedback) > 5000:
-        return jsonify(success=False, message="Feedback must be 5000 characters or fewer."), 400
-    feedback = feedback.strip() or "No feedback provided"
+        user_name = "Anonymous user"
+        user_email = "Not available"
 
     stars = "⭐" * rating + "☆" * (5 - rating)
     submitted_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     email_subject = f"New FraudLens Rating — {rating}/5 Stars"
     email_text = (
         "New FraudLens App Rating Received\n\n"
-        f"Rating: {stars} ({rating}/5)\n"
+        f"Rating: {rating}/5 stars ({stars})\n"
         f"Submitted By: {user_name}\n"
         f"User Email: {user_email}\n"
-        f"Feedback: {feedback}\n"
         f"Submitted At: {submitted_at}"
     )
     safe_user_name = html.escape(user_name)
     safe_user_email = html.escape(user_email)
-    safe_feedback = html.escape(feedback)
     email_html = f"""
     <html><body style="font-family:Arial,sans-serif;color:#1f2733;line-height:1.6">
       <h2>New FraudLens App Rating Received</h2>
-      <p><strong>Rating:</strong> {stars} ({rating}/5)</p>
+    <p><strong>Rating:</strong> {rating}/5 stars ({stars})</p>
       <p><strong>Submitted By:</strong> {safe_user_name}</p>
       <p><strong>User Email:</strong> {safe_user_email}</p>
-      <p><strong>Feedback:</strong> {safe_feedback}</p>
       <p><strong>Submitted At:</strong> {submitted_at}</p>
     </body></html>
     """
@@ -873,10 +853,11 @@ def api_detect_sms():
         try:
             cleaned = sms_utils.clean_text(message)
             vec = sms_vectorizer.transform([cleaned])
-            prediction = sms_model.predict(vec)[0]  # 'spam' or 'ham'
             proba = sms_model.predict_proba(vec)[0]
             classes = list(sms_model.classes_)
-            confidence = float(proba[classes.index(prediction)])
+            prediction_index = int(proba.argmax())
+            prediction = classes[prediction_index]
+            confidence = float(proba[prediction_index])
         except Exception:
             app.logger.exception("Error during model prediction; falling back to rules.")
             prediction = "spam" if len(indicators) >= 2 else "ham"

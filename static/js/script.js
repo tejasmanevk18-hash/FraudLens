@@ -923,7 +923,7 @@
   }
 
   /* =======================================================
-     SMS Detector (demo simulation)
+     SMS Detector
   ======================================================= */
   function initSmsDetector() {
     const textarea =
@@ -949,6 +949,8 @@
     const resultCard =
       document.getElementById('smsResult');
 
+    let analysisInProgress = false;
+
     const exampleText =
       "URGENT: Your bank account has been suspended. Verify your KYC immediately by clicking [http://bit.ly/verify-kyc-now](http://bit.ly/verify-kyc-now) or your account will be permanently blocked within 24 hours.";
 
@@ -973,6 +975,7 @@
     });
 
     analyzeBtn.addEventListener('click', async () => {
+      if (analysisInProgress) return;
       const text = textarea.value.trim();
 
       if (!text) {
@@ -982,6 +985,8 @@
         );
         return;
       }
+      analysisInProgress = true;
+      analyzeBtn.disabled = true;
       loading?.classList.add('active');
       resultCard.classList.add('hidden-result');
       try {
@@ -1000,6 +1005,8 @@
       } catch (error) {
         showToast('Network error while analyzing SMS.', 'error');
       } finally {
+        analysisInProgress = false;
+        analyzeBtn.disabled = false;
         loading?.classList.remove('active');
       }
     });
@@ -1256,75 +1263,79 @@
     }
 
     async function scanFrame() {
-      if (!stream || video.readyState < 2 || !video.videoWidth || !video.videoHeight || scanInProgress) {
-        if (stream) scanTimer = setTimeout(scanFrame, 500);
+      if (!stream || hasScan) return;
+      if (video.readyState < 2 || !video.videoWidth || !video.videoHeight || scanInProgress) {
+        if (stream) scanTimer = setTimeout(scanFrame, 100);
         return;
       }
       scanInProgress = true;
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      const context = canvas.getContext('2d', { alpha: false });
-      context.imageSmoothingEnabled = false;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      let decoded = '';
       if (nativeDetector) {
         try {
-          const codes = await nativeDetector.detect(canvas);
-          const decoded = codes[0]?.rawValue || codes[0]?.displayValue || '';
-          if (decoded) {
-            const found = await analyzeDecodedQr(decoded);
-            if (found) {
-              hasScan = true;
-              clearBtn.hidden = false;
-              setStatus('QR code detected. Camera stopped.', 'bi-check-circle');
-              stopCamera({ keepButtons: true, statusMessage: 'Camera stopped. Start again to scan another code.' });
-              scanInProgress = false;
-              return;
-            }
-          }
+          const codes = await nativeDetector.detect(video);
+          decoded = codes[0]?.rawValue || codes[0]?.displayValue || '';
         } catch (error) {
-          // Fall back to the JS decoder below.
+          nativeDetector = null;
         }
       }
 
-      if (window.jsQR) {
+      if (!decoded && window.jsQR) {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext('2d', { alpha: false });
         try {
+          context.imageSmoothingEnabled = false;
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
           const code = window.jsQR(imageData.data, imageData.width, imageData.height, {
             inversionAttempts: 'attemptBoth'
           });
-          if (code?.data) {
-            const found = await analyzeDecodedQr(code.data);
+          decoded = code?.data || '';
+        } catch (error) {
+          context?.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+
+      if (decoded) {
+        hasScan = true;
+        clearBtn.hidden = false;
+        loading?.classList.add('active');
+        try {
+          await analyzeDecodedQr(decoded);
+        } finally {
+          loading?.classList.remove('active');
+        }
+        setStatus('QR code detected. Camera stopped.', 'bi-check-circle');
+        stopCamera({ keepButtons: true, statusMessage: 'Camera stopped. Start again to scan another code.' });
+        scanInProgress = false;
+        return;
+      }
+
+      if (!window.jsQR) {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext('2d', { alpha: false });
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(async (blob) => {
+          if (blob && stream) {
+            const found = await serverScan(blob, true);
             if (found) {
               hasScan = true;
               clearBtn.hidden = false;
               setStatus('QR code detected. Camera stopped.', 'bi-check-circle');
               stopCamera({ keepButtons: true, statusMessage: 'Camera stopped. Start again to scan another code.' });
-              scanInProgress = false;
-              return;
             }
           }
           scanInProgress = false;
-          if (stream) scanTimer = setTimeout(scanFrame, 250);
-          return;
-        } catch (error) {
-          // Fall through to the server decoder if the browser decoder fails.
-        }
+          if (stream && !hasScan) scanTimer = setTimeout(scanFrame, 250);
+        }, 'image/png');
+        return;
       }
 
-      canvas.toBlob(async (blob) => {
-        if (blob && stream) {
-          const found = await serverScan(blob, true);
-          if (found) {
-            hasScan = true;
-            clearBtn.hidden = false;
-            setStatus('QR code detected. Camera stopped.', 'bi-check-circle');
-            stopCamera({ keepButtons: true, statusMessage: 'Camera stopped. Start again to scan another code.' });
-          }
-        }
-        scanInProgress = false;
-        if (stream) scanTimer = setTimeout(scanFrame, 700);
-      }, 'image/png');
+      scanInProgress = false;
+      if (stream && !hasScan) scanTimer = setTimeout(scanFrame, 250);
     }
 
     async function analyzeDecodedQr(decoded) {
@@ -1373,7 +1384,6 @@
         activeDeviceId = newStream.getVideoTracks()[0]?.getSettings?.().deviceId
           || cameraDevices[safeIndex]?.deviceId
           || '';
-        await detectAvailableCameras();
         video.hidden = false;
         startBtn.hidden = true;
         stopBtn.hidden = false;
@@ -1382,6 +1392,7 @@
         }
         setStatus('Scanning live camera feed for a QR code…', 'bi-broadcast');
         scanFrame();
+        detectAvailableCameras();
       } catch (error) {
         stopCamera({ keepButtons: true, statusMessage: 'Camera unavailable or permission denied.' });
         const message = error.name === 'NotAllowedError'
