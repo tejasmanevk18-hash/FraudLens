@@ -46,6 +46,38 @@ CREATE TABLE IF NOT EXISTS qr_scans (
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS email_scans (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    sender VARCHAR(255) NULL,
+    reply_to VARCHAR(255) NULL,
+    subject VARCHAR(255) NULL,
+    result VARCHAR(20) NOT NULL,
+    risk_score DECIMAL(5,2) NOT NULL DEFAULT 0,
+    indicators JSON NULL,
+    suspicious_urls JSON NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_email_scans_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS file_scans (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    original_filename VARCHAR(255) NOT NULL,
+    file_type VARCHAR(50) NOT NULL,
+    file_size INT UNSIGNED NOT NULL,
+    result VARCHAR(20) NOT NULL,
+    risk_score DECIMAL(5,2) NOT NULL DEFAULT 0,
+    indicators JSON NULL,
+    suspicious_urls JSON NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_file_scans_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,

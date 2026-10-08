@@ -37,6 +37,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from db import (
     check_user_by_email, create_user, get_user_by_id, get_all_users,
     save_sms_scan, save_link_scan, save_qr_scan,
+    save_email_scan, save_file_scan,
     get_scan_history, get_scan_stats, DatabaseUnavailableError,
     ensure_password_reset_tokens_table, create_password_reset_token,
     get_password_reset_token_record, mark_password_reset_token_used,
@@ -1109,6 +1110,19 @@ def api_scan_email():
     if not content:
         return jsonify(success=False, message="Please enter email content to analyze."), 400
     result = scanner_utils.analyze_email_text(content, source="paste")
+    metadata = result.get("email_metadata", {})
+    saved = save_email_scan(
+        session["user_id"],
+        metadata.get("sender", ""),
+        metadata.get("reply_to", ""),
+        metadata.get("subject", ""),
+        result.get("status", "Safe"),
+        result.get("risk_score", 0),
+        result.get("indicators", []),
+        result.get("suspicious_urls", []),
+    )
+    if not saved:
+        app.logger.warning("Email scan completed but history could not be saved.")
     return jsonify(result)
 
 
@@ -1117,6 +1131,19 @@ def api_scan_email():
 def api_upload_eml():
     import scanner_utils
 
+    metadata = result.get("email_metadata", {})
+    saved = save_email_scan(
+        session["user_id"],
+        metadata.get("sender", ""),
+        metadata.get("reply_to", ""),
+        metadata.get("subject", ""),
+        result.get("status", "Safe"),
+        result.get("risk_score", 0),
+        result.get("indicators", []),
+        result.get("suspicious_urls", []),
+    )
+    if not saved:
+        app.logger.warning("EML scan completed but history could not be saved.")
     file = request.files.get("email_file")
     if not file or not file.filename:
         return jsonify(success=False, message="Please select a .eml file to upload."), 400
@@ -1153,6 +1180,18 @@ def api_scan_file():
     )
     if not result["success"]:
         return jsonify(result), 400
+    saved = save_file_scan(
+        session["user_id"],
+        result.get("file_name", file.filename.strip()),
+        result.get("file_type", "UNKNOWN"),
+        result.get("file_size", len(file_bytes)),
+        result.get("status", "Safe"),
+        result.get("risk_score", 0),
+        result.get("indicators", []),
+        result.get("suspicious_urls", []),
+    )
+    if not saved:
+        app.logger.warning("File scan completed but history could not be saved.")
     return jsonify(result)
 
 

@@ -6,6 +6,7 @@ All database operations are centralized here for maintainability.
 """
 
 import hashlib
+import json
 import os
 import traceback
 
@@ -401,6 +402,41 @@ def save_qr_scan(user_id, qr_content, result, risk_score):
     return _insert_scan(
         "INSERT INTO qr_scans (user_id, qr_content, result, risk_score) VALUES (%s, %s, %s, %s)",
         (user_id, qr_content, result, risk_score)
+    )
+
+
+def save_email_scan(user_id, sender, reply_to, subject, result, risk_score,
+                     indicators, suspicious_urls):
+    return _insert_scan(
+        """
+        INSERT INTO email_scans
+            (user_id, sender, reply_to, subject, result, risk_score,
+             indicators, suspicious_urls)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            user_id, sender, reply_to, subject, result, risk_score,
+            json.dumps(indicators or []),
+            json.dumps(suspicious_urls or []),
+        )
+    )
+
+
+def save_file_scan(user_id, original_filename, file_type, file_size, result,
+                   risk_score, indicators, suspicious_urls):
+    return _insert_scan(
+        """
+        INSERT INTO file_scans
+            (user_id, original_filename, file_type, file_size, result,
+             risk_score, indicators, suspicious_urls)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            user_id, original_filename, file_type, file_size, result,
+            risk_score,
+            json.dumps(indicators or []),
+            json.dumps(suspicious_urls or []),
+        )
     )
 
 

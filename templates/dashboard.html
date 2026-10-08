@@ -123,38 +123,66 @@
   <section class="mt-5">
     <span class="section-label">Tools</span>
     <h2 class="mt-1 mb-4" style="font-size:1.5rem;">Everything you need to check before you tap</h2>
-    <div class="row g-3">
-      <div class="col-md-6 col-lg-3">
-        <div class="fl-card feature-card">
-          <div class="feature-icon tone-blue"><i class="bi bi-chat-dots"></i></div>
-          <h3>AI SMS Detector</h3>
+    <div class="row g-3 feature-grid">
+      <div class="col-12 col-md-6 col-lg-4">
+        <a class="fl-card feature-card feature-card-sms" href="{{ url_for('sms_detector') }}" aria-label="Open SMS Detector">
+          <span class="feature-card-corner"></span>
+          <div class="feature-card-topline"><span class="feature-icon tone-blue"><i class="bi bi-chat-dots"></i></span><span class="feature-status"><i class="bi bi-shield-check"></i>PROTECTION</span></div>
+          <span class="feature-category">MESSAGE SECURITY</span>
+          <h3>SMS Detector</h3>
           <p>Analyze suspicious messages for scam language and phishing patterns.</p>
-          <a href="{{ url_for('sms_detector') }}" class="btn btn-primary btn-sm mt-2">Open</a>
-        </div>
+          <span class="feature-cta"><span>Open Scanner</span><i class="bi bi-arrow-right"></i></span>
+        </a>
       </div>
-      <div class="col-md-6 col-lg-3">
-        <div class="fl-card feature-card">
-          <div class="feature-icon tone-violet"><i class="bi bi-link-45deg"></i></div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <a class="fl-card feature-card feature-card-link" href="{{ url_for('link_checker') }}" aria-label="Open Link Checker">
+          <span class="feature-card-corner"></span>
+          <div class="feature-card-topline"><span class="feature-icon tone-violet"><i class="bi bi-link-45deg"></i></span><span class="feature-status"><i class="bi bi-shield-check"></i>SECURITY TOOL</span></div>
+          <span class="feature-category">URL VERIFICATION</span>
           <h3>Link Checker</h3>
           <p>Check suspicious URLs for phishing and redirect risks before you click.</p>
-          <a href="{{ url_for('link_checker') }}" class="btn btn-primary btn-sm mt-2">Open</a>
-        </div>
+          <span class="feature-cta"><span>Check Link</span><i class="bi bi-arrow-right"></i></span>
+        </a>
       </div>
-      <div class="col-md-6 col-lg-3">
-        <div class="fl-card feature-card">
-          <div class="feature-icon tone-navy"><i class="bi bi-qr-code-scan"></i></div>
-          <h3>QR Safety Scanner</h3>
+      <div class="col-12 col-md-6 col-lg-4">
+        <a class="fl-card feature-card feature-card-qr" href="{{ url_for('qr_scanner') }}" aria-label="Open QR Scanner">
+          <span class="feature-card-corner"></span>
+          <div class="feature-card-topline"><span class="feature-icon tone-navy"><i class="bi bi-qr-code-scan"></i></span><span class="feature-status"><i class="bi bi-shield-check"></i>SCAN TOOL</span></div>
+          <span class="feature-category">QR INSPECTION</span>
+          <h3>QR Scanner</h3>
           <p>Scan QR codes safely and reveal where they actually lead.</p>
-          <a href="{{ url_for('qr_scanner') }}" class="btn btn-primary btn-sm mt-2">Open</a>
-        </div>
+          <span class="feature-cta"><span>Scan QR</span><i class="bi bi-arrow-right"></i></span>
+        </a>
       </div>
-      <div class="col-md-6 col-lg-3">
-        <div class="fl-card feature-card">
-          <div class="feature-icon tone-teal"><i class="bi bi-mortarboard"></i></div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <a class="fl-card feature-card feature-card-email" href="{{ url_for('email_scanner') }}" aria-label="Open Email Scanner">
+          <span class="feature-card-corner"></span>
+          <div class="feature-card-topline"><span class="feature-icon tone-teal"><i class="bi bi-envelope-paper"></i></span><span class="feature-status"><i class="bi bi-shield-check"></i>SECURITY TOOL</span></div>
+          <span class="feature-category">MESSAGE ANALYSIS</span>
+          <h3>Email Scanner</h3>
+          <p>Analyze suspicious emails and detect phishing threats.</p>
+          <span class="feature-cta"><span>Scan Email</span><i class="bi bi-arrow-right"></i></span>
+        </a>
+      </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <a class="fl-card feature-card feature-card-file" href="{{ url_for('file_scanner') }}" aria-label="Open File Scanner">
+          <span class="feature-card-corner"></span>
+          <div class="feature-card-topline"><span class="feature-icon tone-blue"><i class="bi bi-file-earmark-check"></i></span><span class="feature-status"><i class="bi bi-shield-check"></i>PROTECTION</span></div>
+          <span class="feature-category">FILE INSPECTION</span>
+          <h3>File Scanner</h3>
+          <p>Scan files for suspicious content and security threats.</p>
+          <span class="feature-cta"><span>Scan File</span><i class="bi bi-arrow-right"></i></span>
+        </a>
+      </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <a class="fl-card feature-card feature-card-safety" href="{{ url_for('safety_hub') }}" aria-label="Open Cyber Safety Hub">
+          <span class="feature-card-corner"></span>
+          <div class="feature-card-topline"><span class="feature-icon tone-violet"><i class="bi bi-shield-check"></i></span><span class="feature-status"><i class="bi bi-shield-check"></i>CYBER AWARENESS</span></div>
+          <span class="feature-category">ONLINE SAFETY</span>
           <h3>Cyber Safety Hub</h3>
           <p>Learn practical, easy-to-follow tips to stay safe online.</p>
-          <a href="{{ url_for('safety_hub') }}" class="btn btn-primary btn-sm mt-2">Open</a>
-        </div>
+          <span class="feature-cta"><span>Explore Hub</span><i class="bi bi-arrow-right"></i></span>
+        </a>
       </div>
     </div>
   </section>
