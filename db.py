@@ -19,8 +19,9 @@ class DatabaseUnavailableError(MySQLError):
 
 # MySQL connection configuration
 #
-# Use environment variables for hosted deployment while keeping the
-# existing local defaults and MYSQL_* compatibility as fallbacks.
+# The application is centrally backed by one MySQL database. Prefer the
+# explicit DB_* variables used by the deployment configuration, while
+# retaining MYSQL_* compatibility for existing local environments.
 DB_CONFIG = {
     "host": os.environ.get("DB_HOST") or os.environ.get("MYSQL_HOST", "127.0.0.1"),
     "user": os.environ.get("DB_USER") or os.environ.get("MYSQL_USER", "root"),
@@ -29,7 +30,8 @@ DB_CONFIG = {
     "port": int(os.environ.get("DB_PORT") or os.environ.get("MYSQL_PORT", "3306")),
 }
 
-# Debug: Show connection info (without password)
+# Keep all server-side account operations on the selected central database.
+# A different database is never selected through browser state or local storage.
 print(f"[DB] MySQL Host: {DB_CONFIG['host']}")
 print(f"[DB] MySQL User: {DB_CONFIG['user']}")
 print(f"[DB] MySQL Port: {DB_CONFIG['port']}")

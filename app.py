@@ -104,15 +104,21 @@ def ensure_password_reset_table():
 
 def send_brevo_email(to_email, subject, html_content, text_content=None, reply_to=None):
     if requests is None:
-        app.logger.warning("Brevo email not sent because the requests dependency is unavailable.")
+        app.logger.error("Brevo email not sent: requests dependency is unavailable.")
         return False
 
     api_key = os.environ.get("BREVO_API_KEY")
     sender_email = os.environ.get("BREVO_SENDER_EMAIL")
     sender_name = os.environ.get("BREVO_SENDER_NAME") or "FraudLens"
 
-    if not api_key or not sender_email:
-        app.logger.warning("Brevo email not sent: missing BREVO_API_KEY or BREVO_SENDER_EMAIL.")
+    if not api_key:
+        app.logger.error("Brevo email not sent: BREVO_API_KEY is not configured.")
+        return False
+    if not sender_email:
+        app.logger.error("Brevo email not sent: BREVO_SENDER_EMAIL is not configured.")
+        return False
+    if not to_email:
+        app.logger.error("Brevo email not sent: recipient email is missing.")
         return False
 
     payload = {
@@ -138,15 +144,16 @@ def send_brevo_email(to_email, subject, html_content, text_content=None, reply_t
         )
         if response.status_code not in (200, 201, 202):
             app.logger.warning(
-                "Brevo email send failed for %s: status=%s body=%s",
-                to_email,
+                "Brevo email request rejected: HTTP status=%s",
                 response.status_code,
-                response.text[:500],
             )
             return False
         return True
     except requests.RequestException as exc:
-        app.logger.warning("Brevo email request failed for %s: %s", to_email, exc)
+        app.logger.warning(
+            "Brevo email request failed: %s",
+            exc.__class__.__name__,
+        )
         return False
 
 
@@ -281,6 +288,7 @@ def contact():
             status_message = "Please complete all fields with valid information and try again."
             status_type = "error"
             return render_template(
+
                 "contact.html", form_data=form_data,
                 status_message=status_message, status_type=status_type,
                 user=current_user_from_session(), rating_csrf_token=rating_csrf_token
@@ -300,6 +308,7 @@ def contact():
           <p><strong>Subject:</strong> {safe_subject}</p>
           <p><strong>Message:</strong></p>
           <p style="white-space:pre-wrap">{safe_message}</p>
+
           <p><strong>Submitted:</strong> {submitted_at}</p>
         </body></html>
         """
@@ -348,10 +357,10 @@ def submit_rating():
 
     user = current_user_from_session()
     if user:
-        user_name = (user.get("full_name") or "").strip() or "Anonymous user"
+        user_name = (user.get("full_name") or "").strip() or "Anonymous"
         user_email = (user.get("email") or "").strip() or "Not available"
     else:
-        user_name = "Anonymous user"
+        user_name = "Anonymous"
         user_email = "Not available"
 
     stars = "⭐" * rating + "☆" * (5 - rating)
@@ -659,6 +668,20 @@ def qr_scanner():
     return render_template("qr_scanner.html", user=user)
 
 
+@app.route("/email_scanner")
+@login_required
+def email_scanner():
+    user = current_user_from_session()
+    return render_template("email_scanner.html", user=user)
+
+
+@app.route("/file_scanner")
+@login_required
+def file_scanner():
+    user = current_user_from_session()
+    return render_template("file_scanner.html", user=user)
+
+
 @app.route("/safety_hub")
 @login_required
 def safety_hub():
@@ -673,6 +696,13 @@ def users_page():
     # Query all users from MySQL database
     all_users = get_all_users()
     return render_template("users.html", user=admin_user, all_users=all_users)
+
+
+@app.route("/api/users")
+@admin_required
+def api_users():
+    """Return the authoritative MySQL user list for the admin UI."""
+    return jsonify(success=True, users=get_all_users())
 
 
 # ---------------------------------------------------------------------------
@@ -999,6 +1029,66 @@ def api_scan_qr():
         return jsonify(success=False, message=error), 422
 
     return jsonify(analyze_qr_content(decoded_data))
+
+
+# ---------------------------------------------------------------------------
+# API — Email scanner
+# ---------------------------------------------------------------------------
+@app.route("/api/scan-email", methods=["POST"])
+@login_required
+def api_scan_email():
+    import scanner_utils
+
+    data = request.get_json(silent=True) or {}
+    content = (data.get("content") or "").strip()
+    if not content:
+        return jsonify(success=False, message="Please enter email content to analyze."), 400
+    result = scanner_utils.analyze_email_text(content, source="paste")
+    return jsonify(result)
+
+
+@app.route("/api/upload-eml", methods=["POST"])
+@login_required
+def api_upload_eml():
+    import scanner_utils
+
+    file = request.files.get("email_file")
+    if not file or not file.filename:
+        return jsonify(success=False, message="Please select a .eml file to upload."), 400
+    filename = file.filename.strip()
+    if not filename.lower().endswith(".eml"):
+        return jsonify(success=False, message="Unsupported email file. Please upload a .eml file."), 400
+    try:
+        file_bytes = file.stream.read()
+    except Exception:
+        return jsonify(success=False, message="The selected email file could not be read."), 400
+    result = scanner_utils.analyze_eml_file(file_bytes, filename)
+    if not result["success"]:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+# ---------------------------------------------------------------------------
+# API — File scanner
+# ---------------------------------------------------------------------------
+@app.route("/api/scan-file", methods=["POST"])
+@login_required
+def api_scan_file():
+    import scanner_utils
+
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return jsonify(success=False, message="Please select a file to scan."), 400
+    try:
+        file_bytes = file.stream.read()
+    except Exception:
+        return jsonify(success=False, message="The selected file could not be read."), 400
+    result = scanner_utils.analyze_uploaded_file(
+        file.filename.strip(), file_bytes, file.mimetype
+    )
+    if not result["success"]:
+        return jsonify(result), 400
+    return jsonify(result)
 
 
 # ---------------------------------------------------------------------------

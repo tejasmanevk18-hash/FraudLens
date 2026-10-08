@@ -8,13 +8,21 @@ services:
     envVars:
       - key: FLASK_SECRET_KEY
         generateValue: true
-      - key: MYSQL_HOST
+      - key: APP_BASE_URL
         sync: false
-      - key: MYSQL_USER
+      - key: BREVO_API_KEY
         sync: false
-      - key: MYSQL_PASSWORD
+      - key: BREVO_SENDER_EMAIL
         sync: false
-      - key: MYSQL_DATABASE
+      - key: BREVO_SENDER_NAME
         sync: false
-      - key: MYSQL_PORT
+      - key: DB_HOST
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_PORT
         sync: false

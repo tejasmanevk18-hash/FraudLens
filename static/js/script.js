@@ -1,212 +1,16 @@
 /* =========================================================
    FraudLens — script.js
    -----------------------------------------------------------
-   Auth fallback is intentionally kept in the browser for the
-   local/offline login/register flow using localStorage.
-   Passwords are never stored in plain text.
+   Authentication is server-side and uses the central MySQL users table.
+   Flask sessions are browser-specific; account identity is global.
 ========================================================= */
 
 (function () {
   'use strict';
 
   /* =======================================================
-     Local Storage — keys & low level helpers
+     Helper functions
   ======================================================= */
-  const LS_KEYS = {
-    USERS: 'fraudLensUsers',
-    CURRENT_USER: 'fraudLensCurrentUser',
-    LOGGED_IN: 'fraudLensLoggedIn'
-  };
-
-  function readJSON(key, fallback) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch (e) {
-      console.warn('FraudLens: could not parse localStorage key', key, e);
-      return fallback;
-    }
-  }
-
-  function writeJSON(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-  }
-
-  async function hashPasswordBrowser(password) {
-    if (!password) return '';
-
-    try {
-      if (window.crypto && window.crypto.subtle) {
-        const digest = await window.crypto.subtle.digest(
-          'SHA-256',
-          new TextEncoder().encode(password)
-        );
-        return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
-      }
-    } catch (e) {
-      console.warn('FraudLens: browser crypto subtle hash failed; using lightweight fallback.', e);
-    }
-
-    let hash = 0;
-    for (let i = 0; i < password.length; i++) {
-      hash = (hash << 5) - hash + password.charCodeAt(i);
-      hash |= 0;
-    }
-    return String(Math.abs(hash));
-  }
-
-  /* =======================================================
-     User Management
-  ======================================================= */
-  function getUsers() {
-    return readJSON(LS_KEYS.USERS, []);
-  }
-
-  function findUserByEmail(email) {
-    if (!email) return null;
-    const normalized = email.trim().toLowerCase();
-    return getUsers().find(u => u.email && u.email.toLowerCase() === normalized) || null;
-  }
-
-  function saveUser({ fullName, email, passwordHash }) {
-    const users = getUsers();
-    const emailKey = email.trim().toLowerCase();
-
-    const existing = users.find(u => u.email && u.email.toLowerCase() === emailKey);
-    if (existing) {
-      existing.fullName = fullName.trim();
-      existing.email = emailKey;
-      existing.passwordHash = passwordHash || existing.passwordHash || '';
-      existing.createdAt = existing.createdAt || new Date().toISOString();
-      writeJSON(LS_KEYS.USERS, users);
-      return existing;
-    }
-
-    const newUser = {
-      id: 'FL-' + Date.now().toString(36).toUpperCase(),
-      fullName: fullName.trim(),
-      email: emailKey,
-      createdAt: new Date().toISOString(),
-      passwordHash: passwordHash || ''
-    };
-
-    users.push(newUser);
-    writeJSON(LS_KEYS.USERS, users);
-    return newUser;
-  }
-
-  function registerLocalUser({ fullName, email, passwordHash }) {
-    const users = getUsers();
-    const emailKey = email.trim().toLowerCase();
-    const existing = users.find(u => u.email && u.email.toLowerCase() === emailKey);
-
-    if (existing) {
-      existing.fullName = fullName.trim();
-      existing.email = emailKey;
-      existing.passwordHash = passwordHash || existing.passwordHash || '';
-      existing.createdAt = existing.createdAt || new Date().toISOString();
-      writeJSON(LS_KEYS.USERS, users);
-      return existing;
-    }
-
-    const newUser = {
-      id: 'FL-' + Date.now().toString(36).toUpperCase(),
-      fullName: fullName.trim(),
-      email: emailKey,
-      createdAt: new Date().toISOString(),
-      passwordHash
-    };
-
-    users.push(newUser);
-    writeJSON(LS_KEYS.USERS, users);
-    return newUser;
-  }
-
-  async function tryLocalLogin(email, password) {
-    const localUser = findUserByEmail(email);
-    if (!localUser || !localUser.passwordHash) return null;
-
-    const localHash = await hashPasswordBrowser(password);
-    if (localUser.passwordHash !== localHash) return null;
-
-    setCurrentUser({
-      id: localUser.id,
-      full_name: localUser.fullName,
-      email: localUser.email,
-      created_at: localUser.createdAt,
-      is_admin: false
-    });
-
-    return localUser;
-  }
-
-  function setCurrentUser(user) {
-    writeJSON(LS_KEYS.CURRENT_USER, user);
-    localStorage.setItem(LS_KEYS.LOGGED_IN, 'true');
-  }
-
-  function getCurrentUser() {
-    return readJSON(LS_KEYS.CURRENT_USER, null);
-  }
-
-  function isLoggedIn() {
-    return localStorage.getItem(LS_KEYS.LOGGED_IN) === 'true' && !!getCurrentUser();
-  }
-
-  function logoutUser() {
-    localStorage.removeItem(LS_KEYS.LOGGED_IN);
-    localStorage.removeItem(LS_KEYS.CURRENT_USER);
-    // Hit server logout route to clear session cookie, then redirect
-    window.location.href = '/logout';
-  }
-
-  window.logoutUser = logoutUser;
-
-  /* =======================================================
-     CSV Export
-  ======================================================= */
-  function exportUsersToCSV() {
-    const users = getUsers();
-
-    if (!users.length) {
-      showToast('No registered users found.', 'error');
-      return;
-    }
-
-    const headers = ['ID', 'Name', 'Email', 'Registered Date'];
-
-    const rows = users.map(u => [
-      u.id,
-      u.fullName,
-      u.email,
-      new Date(u.createdAt).toLocaleString()
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map(row => row.map(escapeCSV).join(','))
-      .join('\r\n');
-
-    const blob = new Blob([csvContent], {
-      type: 'text/csv;charset=utf-8;'
-    });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-
-    link.href = url;
-    link.download = 'fraudlens_users.csv';
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    URL.revokeObjectURL(url);
-
-    showToast('Users exported to fraudlens_users.csv', 'success');
-  }
-
-  window.exportUsersToCSV = exportUsersToCSV;
-
   function escapeCSV(value) {
     const str = String(value ?? '');
 
@@ -216,6 +20,59 @@
 
     return str;
   }
+
+  /* =======================================================
+     CSV Export
+  ======================================================= */
+  async function exportUsersToCSV() {
+    try {
+      const resp = await fetch('/api/users', { credentials: 'same-origin' });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) {
+        showToast('Could not load registered users.', 'error');
+        return;
+      }
+
+      const users = data.users || [];
+      if (!users.length) {
+        showToast('No registered users found.', 'error');
+        return;
+      }
+
+      const headers = ['ID', 'Name', 'Email', 'Registered Date'];
+      const rows = users.map(u => [
+        u.id,
+        u.full_name,
+        u.email,
+        new Date(u.created_at).toLocaleString()
+      ]);
+
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(escapeCSV).join(','))
+        .join('\r\n');
+
+      const blob = new Blob([csvContent], {
+        type: 'text/csv;charset=utf-8;'
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+
+      link.href = url;
+      link.download = 'fraudlens_users.csv';
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
+      showToast('Users exported to fraudlens_users.csv', 'success');
+    } catch (err) {
+      showToast('Could not export registered users.', 'error');
+    }
+  }
+
+  window.exportUsersToCSV = exportUsersToCSV;
 
   /* =======================================================
      Notifications (toasts)
@@ -390,12 +247,11 @@
       if (hasError) return;
 
       try {
-        const localPasswordHash = await hashPasswordBrowser(password);
         const resp = await fetch('/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ fullName, email, password, confirmPassword, localPasswordHash })
+          body: JSON.stringify({ fullName, email, password, confirmPassword })
         });
 
         const data = await resp.json().catch(() => ({}));
@@ -437,7 +293,6 @@
 
       const email = document.getElementById('emailInput').value.trim();
       const password = document.getElementById('passwordInput').value;
-      const remember = document.getElementById('rememberCheck');
 
       let hasError = false;
 
@@ -454,21 +309,16 @@
       if (hasError) return;
 
       try {
-        const localPasswordHash = await hashPasswordBrowser(password);
         const resp = await fetch('/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ email, password, localPasswordHash })
+          body: JSON.stringify({ email, password })
         });
 
         const data = await resp.json().catch(() => ({}));
 
         if (resp.ok && data.success) {
-          if (remember && remember.checked) {
-            localStorage.setItem('fraudLensRememberEmail', email);
-          }
-
           showToast(data.message || 'Login successful! Redirecting…', 'success');
 
           setTimeout(() => {
@@ -486,25 +336,6 @@
         showFormAlert(form, 'Network error. Please try again.');
       }
     });
-
-    const rememberedEmail =
-      localStorage.getItem('fraudLensRememberEmail');
-
-    if (rememberedEmail) {
-      const emailInput =
-        document.getElementById('emailInput');
-
-      if (emailInput) {
-        emailInput.value = rememberedEmail;
-      }
-
-      const remember =
-        document.getElementById('rememberCheck');
-
-      if (remember) {
-        remember.checked = true;
-      }
-    }
   }
 
   /* =======================================================
@@ -696,15 +527,12 @@
       .forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
-          // Clear any local demo storage and call server logout
-          localStorage.removeItem(LS_KEYS.LOGGED_IN);
-          localStorage.removeItem(LS_KEYS.CURRENT_USER);
           window.location.href = '/logout';
         });
       });
   }
 
-  function renderUsersTable() {
+  async function renderUsersTable() {
     const tbody =
       document.getElementById('usersTableBody');
 
@@ -716,59 +544,71 @@
 
     if (!tbody) return;
 
-    const users = getUsers();
+    try {
+      const resp = await fetch('/api/users', { credentials: 'same-origin' });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) {
+        throw new Error('Unable to load users');
+      }
 
-    tbody.innerHTML = '';
+      const users = data.users || [];
+      tbody.innerHTML = '';
 
-    if (!users.length) {
+      if (!users.length) {
+        if (wrapper) {
+          wrapper.classList.add('d-none');
+        }
+
+        if (emptyState) {
+          emptyState.classList.remove('d-none');
+        }
+
+        return;
+      }
+
       if (wrapper) {
-        wrapper.classList.add('d-none');
+        wrapper.classList.remove('d-none');
       }
 
       if (emptyState) {
-        emptyState.classList.remove('d-none');
+        emptyState.classList.add('d-none');
       }
 
-      return;
+      users.forEach(u => {
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td>
+            <span
+              class="text-muted-soft"
+              style="font-family:var(--font-mono); font-size:0.82rem;"
+            >${u.id}</span>
+          </td>
+
+          <td>${escapeHTML(u.full_name)}</td>
+
+          <td>${escapeHTML(u.email)}</td>
+
+          <td>
+            ${new Date(u.created_at).toLocaleDateString(
+              undefined,
+              {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              }
+            )}
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      if (emptyState) {
+        emptyState.classList.remove('d-none');
+        emptyState.textContent = 'Unable to load registered users.';
+      }
     }
-
-    if (wrapper) {
-      wrapper.classList.remove('d-none');
-    }
-
-    if (emptyState) {
-      emptyState.classList.add('d-none');
-    }
-
-    users.forEach(u => {
-      const tr = document.createElement('tr');
-
-      tr.innerHTML = `
-        <td>
-          <span
-            class="text-muted-soft"
-            style="font-family:var(--font-mono); font-size:0.82rem;"
-          >${u.id}</span>
-        </td>
-
-        <td>${escapeHTML(u.fullName)}</td>
-
-        <td>${escapeHTML(u.email)}</td>
-
-        <td>
-          ${new Date(u.createdAt).toLocaleDateString(
-            undefined,
-            {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            }
-          )}
-        </td>
-      `;
-
-      tbody.appendChild(tr);
-    });
   }
 
   function escapeHTML(str) {
@@ -1127,6 +967,129 @@
         </div>
       </div>
     `;
+  }
+
+  function renderScannerResult(data, resultCard, { title, metadata = [], extra = '' } = {}) {
+    const level = data.status || data.level || 'Unknown';
+    const cls = level.toLowerCase().includes('safe') ? 'safe' : level.toLowerCase().includes('suspicious') ? 'medium' : 'high';
+    const score = Number(data.risk_score ?? data.score ?? 0);
+    const flags = data.indicators || data.flags || [];
+    const metadataHtml = metadata.map(([label, value]) => `<div class="scanner-file-meta"><i class="bi bi-info-circle"></i><span><strong>${escapeHTML(label)}:</strong> ${escapeHTML(value)}</span></div>`).join('');
+    resultCard.classList.remove('hidden-result');
+    resultCard.innerHTML = `
+      <div class="result-header"><h4>${escapeHTML(title)}</h4><div class="result-badge ${cls}">${escapeHTML(level)}</div></div>
+      <div class="result-body mt-3">
+        <div class="d-flex flex-wrap gap-2"><span class="indicator-chip"><i class="bi bi-shield-lock me-1"></i>Risk ${Math.round(score)}%</span><span class="indicator-chip"><i class="bi bi-clock me-1"></i>Scanned ${new Date().toLocaleString()}</span></div>
+        ${metadataHtml}${extra}
+        <p class="mt-3">${escapeHTML(data.recommendation || 'Review the results before taking any action.')}</p>
+        <div class="mt-3"><strong>Detected issues:</strong><ul class="mb-0">${(flags || []).map(f => `<li>${escapeHTML(f)}</li>`).join('')}</ul></div>
+      </div>`;
+  }
+
+  async function postFormData(url, formData, loading, resultCard, onSuccess) {
+    loading?.classList.add('active');
+    resultCard.classList.add('hidden-result');
+    try {
+      const response = await fetch(url, { method: 'POST', credentials: 'same-origin', body: formData });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || 'Scan failed. Please try again.');
+      onSuccess(data);
+    } catch (error) {
+      showToast(error.message || 'The scan could not be completed.', 'error');
+    } finally {
+      loading?.classList.remove('active');
+    }
+  }
+
+  function setupDropZone(dropZone, input, onFileSelected) {
+    if (!dropZone || !input) return;
+    const select = file => {
+      const selected = file || input.files?.[0];
+      if (!selected) return;
+      onFileSelected(selected);
+    };
+    dropZone.addEventListener('click', () => input.click());
+    dropZone.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); input.click(); }
+    });
+    input.addEventListener('change', () => select());
+    ['dragenter', 'dragover'].forEach(type => dropZone.addEventListener(type, event => { event.preventDefault(); dropZone.classList.add('dragover'); }));
+    ['dragleave', 'drop'].forEach(type => dropZone.addEventListener(type, event => { event.preventDefault(); dropZone.classList.remove('dragover'); }));
+    dropZone.addEventListener('drop', event => select(event.dataTransfer.files[0]));
+  }
+
+  function initEmailScanner() {
+    const input = document.getElementById('emailInput');
+    const analyzeBtn = document.getElementById('analyzeEmailBtn');
+    if (!input || !analyzeBtn) return;
+    const emailFileInput = document.getElementById('emailFileInput');
+    const emailDropZone = document.getElementById('emailDropZone');
+    const emailFileName = document.getElementById('emailFileName');
+    const uploadBtn = document.getElementById('uploadEmailBtn');
+    const loading = document.getElementById('emailLoading');
+    const resultCard = document.getElementById('emailResult');
+    let selectedEmailFile = null;
+    let analysisInProgress = false;
+    const counter = document.getElementById('emailCharCount');
+
+    input.addEventListener('input', () => { counter.textContent = `${input.value.length.toLocaleString()} / 100,000`; });
+    document.getElementById('clearEmailBtn')?.addEventListener('click', () => { input.value = ''; counter.textContent = '0 / 100,000'; resultCard.classList.add('hidden-result'); });
+    document.getElementById('exampleEmailBtn')?.addEventListener('click', () => { input.value = 'From: payroll@secure-account.example\nSubject: Account verification required\n\nYour account is temporarily locked. Verify your password and enter your OTP immediately at http://bit.ly/verify-account.'; input.dispatchEvent(new Event('input')); input.focus(); });
+    analyzeBtn.addEventListener('click', async () => {
+      if (analysisInProgress) return;
+      const text = input.value.trim();
+      if (!text) { showToast('Please enter email content to analyze.', 'error'); return; }
+      analysisInProgress = true;
+      analyzeBtn.disabled = true;
+      await postFormData('/api/scan-email', new Blob([JSON.stringify({ content: text })], { type: 'application/json' }), loading, resultCard, data => renderScannerResult(data, resultCard, { title: 'Email Analysis', metadata: [['Status', data.status], ['Risk score', `${data.risk_score}%`]] }));
+      analysisInProgress = false;
+      analyzeBtn.disabled = false;
+    });
+    setupDropZone(emailDropZone, emailFileInput, file => {
+      if (!file.name.toLowerCase().endsWith('.eml')) { showToast('Only .eml files are supported.', 'error'); return; }
+      selectedEmailFile = file;
+      emailFileName.textContent = `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
+      emailDropZone.classList.add('has-file');
+      uploadBtn.disabled = false;
+    });
+    uploadBtn.addEventListener('click', async () => {
+      if (!selectedEmailFile || analysisInProgress) return;
+      analysisInProgress = true;
+      uploadBtn.disabled = true;
+      const formData = new FormData();
+      formData.append('email_file', selectedEmailFile);
+      await postFormData('/api/upload-eml', formData, loading, resultCard, data => renderScannerResult(data, resultCard, { title: 'Email File Analysis', metadata: [['File', data.email_metadata?.subject || selectedEmailFile.name], ['Sender', data.email_metadata?.sender || 'Not provided'], ['Reply-To', data.email_metadata?.reply_to || 'Not provided'], ['Risk score', `${data.risk_score}%`]] }));
+      analysisInProgress = false;
+      uploadBtn.disabled = false;
+    });
+  }
+
+  function initFileScanner() {
+    const input = document.getElementById('fileInput');
+    const scanBtn = document.getElementById('scanFileBtn');
+    if (!input || !scanBtn) return;
+    const dropZone = document.getElementById('fileDropZone');
+    const selectedName = document.getElementById('fileSelectedName');
+    const loading = document.getElementById('fileLoading');
+    const resultCard = document.getElementById('fileResult');
+    let selectedFile = null;
+    let analysisInProgress = false;
+    setupDropZone(dropZone, input, file => {
+      selectedFile = file;
+      selectedName.textContent = `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
+      dropZone.classList.add('has-file');
+      scanBtn.disabled = false;
+    });
+    document.getElementById('clearFileBtn')?.addEventListener('click', () => { selectedFile = null; input.value = ''; selectedName.textContent = ''; dropZone.classList.remove('has-file'); scanBtn.disabled = true; resultCard.classList.add('hidden-result'); });
+    scanBtn.addEventListener('click', async () => {
+      if (!selectedFile || analysisInProgress) return;
+      analysisInProgress = true;
+      scanBtn.disabled = true;
+      const formData = new FormData(); formData.append('file', selectedFile);
+      await postFormData('/api/scan-file', formData, loading, resultCard, data => renderScannerResult(data, resultCard, { title: 'File Analysis', metadata: [['File', data.file_name], ['Type', data.file_type], ['Size', `${data.file_size} bytes`], ['Risk score', `${data.risk_score}%`]] }));
+      analysisInProgress = false;
+      scanBtn.disabled = false;
+    });
   }
 
   /* =======================================================
@@ -1670,6 +1633,14 @@
 
     if (document.getElementById('linkInput')) {
       initLinkChecker();
+    }
+
+    if (document.getElementById('emailInput')) {
+      initEmailScanner();
+    }
+
+    if (document.getElementById('fileInput')) {
+      initFileScanner();
     }
 
     initSidebar();

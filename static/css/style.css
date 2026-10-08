@@ -1024,6 +1024,32 @@ a { text-decoration: none; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.scanner-drop-zone {
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  padding: 2rem 1.25rem;
+  text-align: center;
+  transition: border-color var(--transition), background var(--transition), transform var(--transition);
+  cursor: pointer;
+}
+.scanner-drop-zone:hover,
+.scanner-drop-zone:focus-visible,
+.scanner-drop-zone.dragover {
+  border-color: var(--accent-color);
+  background: #DCE9FE;
+  outline: none;
+}
+.scanner-drop-zone.dragover { transform: translateY(-2px); }
+.scanner-drop-zone i { display: block; color: var(--accent-color); font-size: 2rem; margin-bottom: .65rem; }
+.scanner-drop-zone strong { display: block; color: var(--primary-color); }
+.scanner-drop-zone span { display: block; color: var(--muted-color); font-size: .88rem; }
+.scanner-drop-zone small { display: block; color: var(--muted-color); margin-top: .55rem; }
+.scanner-drop-zone.has-file { border-style: solid; border-color: rgba(30, 158, 108, .45); background: var(--success-bg); }
+.scanner-file-meta { display: flex; align-items: center; gap: .65rem; padding: .75rem; border-radius: var(--radius-sm); background: var(--accent-soft); }
+.scanner-file-meta i { color: var(--accent-color); }
+.scanner-file-meta span { min-width: 0; overflow-wrap: anywhere; }
+
 /* QR scanner */
 .qr-drop-zone {
   border: 2px dashed var(--border-color);
