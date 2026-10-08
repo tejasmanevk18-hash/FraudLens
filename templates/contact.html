@@ -105,7 +105,7 @@
       <p class="text-muted-soft mb-4">Share a few details and we'll be in touch.</p>
 
       {% if status_message %}
-      <div class="alert alert-{{ 'success' if status_type == 'success' else 'danger' }} contact-alert" role="status" aria-live="polite">{{ status_message }}</div>
+      <div id="contactStatus" class="alert alert-{{ 'success' if status_type == 'success' else 'danger' }} contact-alert" role="status" aria-live="polite">{{ status_message }}</div>
       {% endif %}
 
       <form method="post" action="{{ url_for('contact') }}" id="contactForm">
@@ -236,14 +236,60 @@
     }
   });
 
-  document.getElementById('contactForm').addEventListener('submit', function () {
-    const form = document.getElementById('contactForm');
+  document.getElementById('contactForm').addEventListener('submit', async function (event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
     const button = document.getElementById('contactSubmit');
+    let status = document.getElementById('contactStatus');
+    if (!status) {
+      status = document.createElement('div');
+      status.id = 'contactStatus';
+      status.setAttribute('role', 'status');
+      status.setAttribute('aria-live', 'polite');
+      status.className = 'alert alert-info contact-alert mb-0';
+      form.insertAdjacentElement('afterbegin', status);
+    }
     if (button.disabled || !form.reportValidity()) return;
 
     button.disabled = true;
     button.querySelector('.contact-submit-label').classList.add('d-none');
     button.querySelector('.contact-submit-loading').classList.remove('d-none');
+    status.className = 'alert alert-info contact-alert mb-0';
+    status.textContent = 'Sending your message…';
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          name: form.elements.name.value.trim(),
+          email: form.elements.email.value.trim(),
+          subject: form.elements.subject.value.trim(),
+          message: form.elements.message.value.trim()
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Unable to send your message right now. Please try again later.');
+      }
+
+      if (status) {
+        status.className = 'alert alert-success contact-alert mb-0';
+        status.textContent = result.message;
+      }
+      form.reset();
+    } catch (error) {
+      if (status) {
+        status.className = 'alert alert-danger contact-alert mb-0';
+        status.textContent = error.message || 'Unable to send your message right now. Please try again later.';
+      }
+    } finally {
+      button.disabled = false;
+      button.querySelector('.contact-submit-label').classList.remove('d-none');
+      button.querySelector('.contact-submit-loading').classList.add('d-none');
+    }
   });
 </script>
 </body>

@@ -109,14 +109,22 @@ def send_brevo_email(to_email, subject, html_content, text_content=None, reply_t
 
     api_key = os.environ.get("BREVO_API_KEY")
     sender_email = os.environ.get("BREVO_SENDER_EMAIL")
-    sender_name = os.environ.get("BREVO_SENDER_NAME") or "FraudLens"
+    sender_name = os.environ.get("BREVO_SENDER_NAME")
+    app_base_url = os.environ.get("APP_BASE_URL")
+    required_variables = {
+        "BREVO_API_KEY": api_key,
+        "BREVO_SENDER_EMAIL": sender_email,
+        "BREVO_SENDER_NAME": sender_name,
+        "APP_BASE_URL": app_base_url,
+    }
+    missing_variables = [name for name, value in required_variables.items() if not value]
+    if missing_variables:
+        app.logger.error(
+            "Brevo email not sent: missing configuration variables: %s",
+            ", ".join(missing_variables),
+        )
+        return False
 
-    if not api_key:
-        app.logger.error("Brevo email not sent: BREVO_API_KEY is not configured.")
-        return False
-    if not sender_email:
-        app.logger.error("Brevo email not sent: BREVO_SENDER_EMAIL is not configured.")
-        return False
     if not to_email:
         app.logger.error("Brevo email not sent: recipient email is missing.")
         return False
@@ -142,16 +150,25 @@ def send_brevo_email(to_email, subject, html_content, text_content=None, reply_t
             json=payload,
             timeout=15,
         )
-        if response.status_code not in (200, 201, 202):
-            app.logger.warning(
-                "Brevo email request rejected: HTTP status=%s",
-                response.status_code,
+        status_code = response.status_code
+        if status_code in (200, 201, 202):
+            app.logger.info(
+                "Brevo email sent successfully to %s; status=%s",
+                to_email,
+                status_code,
             )
-            return False
-        return True
+            return True
+
+        app.logger.warning(
+            "Brevo email request rejected for %s: status=%s",
+            to_email,
+            status_code,
+        )
+        return False
     except requests.RequestException as exc:
         app.logger.warning(
-            "Brevo email request failed: %s",
+            "Brevo email request failed for %s: %s",
+            to_email,
             exc.__class__.__name__,
         )
         return False
@@ -261,8 +278,10 @@ def contact():
         session["rating_csrf_token"] = rating_csrf_token
 
     if request.method == "POST":
+        is_json_request = request.is_json or "application/json" in request.headers.get("Accept", "")
+        source = request.get_json(silent=True) if is_json_request else request.form
         form_data = {
-            key: (request.form.get(key) or "").strip()
+            key: (source.get(key) or "").strip()
             for key in ("name", "email", "subject", "message")
         }
         name = form_data["name"]
@@ -285,10 +304,12 @@ def contact():
             or not message or len(message) > 5000
             or has_header_newline
         ):
+            app.logger.warning("Contact form validation failed: required or invalid fields received.")
             status_message = "Please complete all fields with valid information and try again."
             status_type = "error"
+            if is_json_request:
+                return jsonify(success=False, message=status_message), 400
             return render_template(
-
                 "contact.html", form_data=form_data,
                 status_message=status_message, status_type=status_type,
                 user=current_user_from_session(), rating_csrf_token=rating_csrf_token
@@ -308,7 +329,6 @@ def contact():
           <p><strong>Subject:</strong> {safe_subject}</p>
           <p><strong>Message:</strong></p>
           <p style="white-space:pre-wrap">{safe_message}</p>
-
           <p><strong>Submitted:</strong> {submitted_at}</p>
         </body></html>
         """
@@ -326,12 +346,18 @@ def contact():
             sent = False
 
         if sent:
+            app.logger.info("Contact email sent successfully to fraudlensdetector@gmail.com.")
             form_data = {"name": "", "email": "", "subject": "", "message": ""}
             status_message = "Message sent successfully! Thank you for contacting FraudLens. We'll get back to you as soon as possible."
             status_type = "success"
+            if is_json_request:
+                return jsonify(success=True, message=status_message), 200
         else:
+            app.logger.error("Brevo request failed for contact submission.")
             status_message = "Unable to send your message right now. Please try again later."
             status_type = "error"
+            if is_json_request:
+                return jsonify(success=False, message=status_message), 503
 
     return render_template(
         "contact.html", form_data=form_data,
