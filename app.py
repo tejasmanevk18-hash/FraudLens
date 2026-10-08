@@ -94,6 +94,17 @@ def ensure_models_loaded():
 
 APP_BASE_URL = (os.environ.get("APP_BASE_URL") or "http://127.0.0.1:5000").rstrip("/")
 
+BREVO_REQUIRED_ENV = ("BREVO_API_KEY", "BREVO_SENDER_EMAIL", "BREVO_SENDER_NAME", "APP_BASE_URL")
+
+
+def missing_brevo_config():
+    """Names (never values) of required Brevo/app variables that are unset."""
+    return [name for name in BREVO_REQUIRED_ENV if not os.environ.get(name)]
+
+
+if missing_brevo_config():
+    app.logger.error("Missing environment variables: %s", ", ".join(missing_brevo_config()))
+
 
 def ensure_password_reset_table():
     try:
@@ -110,12 +121,10 @@ def send_brevo_email(to_email, subject, html_content, text_content=None, reply_t
     api_key = os.environ.get("BREVO_API_KEY")
     sender_email = os.environ.get("BREVO_SENDER_EMAIL")
     sender_name = os.environ.get("BREVO_SENDER_NAME")
-    app_base_url = os.environ.get("APP_BASE_URL")
     required_variables = {
         "BREVO_API_KEY": api_key,
         "BREVO_SENDER_EMAIL": sender_email,
         "BREVO_SENDER_NAME": sender_name,
-        "APP_BASE_URL": app_base_url,
     }
     missing_variables = [name for name, value in required_variables.items() if not value]
     if missing_variables:
@@ -159,10 +168,26 @@ def send_brevo_email(to_email, subject, html_content, text_content=None, reply_t
             )
             return True
 
-        app.logger.warning(
-            "Brevo email request rejected for %s: status=%s",
-            to_email,
+        brevo_code = brevo_message = None
+        try:
+            error_body = response.json()
+            if isinstance(error_body, dict):
+                brevo_code = error_body.get("code")
+                brevo_message = error_body.get("message")
+        except ValueError:
+            pass
+        reasons = {
+            400: "invalid request/data or unvalidated sender",
+            401: "invalid API key",
+            403: "permission/sender or IP not allowed",
+            429: "rate limited",
+        }
+        app.logger.error(
+            "Brevo request failed: status=%s brevo_message=%s brevo_code=%s reason=%s",
             status_code,
+            brevo_message,
+            brevo_code,
+            reasons.get(status_code, "Brevo server error" if status_code >= 500 else "unexpected response"),
         )
         return False
     except requests.RequestException as exc:
@@ -279,9 +304,10 @@ def contact():
 
     if request.method == "POST":
         is_json_request = request.is_json or "application/json" in request.headers.get("Accept", "")
-        source = request.get_json(silent=True) if is_json_request else request.form
+        json_body = request.get_json(silent=True) if request.is_json else None
+        source = json_body if isinstance(json_body, dict) else request.form
         form_data = {
-            key: (source.get(key) or "").strip()
+            key: (source.get(key) if isinstance(source.get(key), str) else "").strip()
             for key in ("name", "email", "subject", "message")
         }
         name = form_data["name"]
@@ -314,6 +340,11 @@ def contact():
                 status_message=status_message, status_type=status_type,
                 user=current_user_from_session(), rating_csrf_token=rating_csrf_token
             ), 400
+
+        missing_config = missing_brevo_config()
+        if missing_config and is_json_request:
+            app.logger.error("Contact email not sent; missing configuration: %s", ", ".join(missing_config))
+            return jsonify(success=False, message="The contact service is not configured. Please try again later."), 503
 
         submitted_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
         email_subject = f"FraudLens Contact: {subject}"

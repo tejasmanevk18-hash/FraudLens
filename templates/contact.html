@@ -236,6 +236,7 @@
     }
   });
 
+  let contactSending = false;
   document.getElementById('contactForm').addEventListener('submit', async function (event) {
     event.preventDefault();
 
@@ -250,8 +251,9 @@
       status.className = 'alert alert-info contact-alert mb-0';
       form.insertAdjacentElement('afterbegin', status);
     }
-    if (button.disabled || !form.reportValidity()) return;
+    if (contactSending || button.disabled || !form.reportValidity()) return;
 
+    contactSending = true;
     button.disabled = true;
     button.querySelector('.contact-submit-label').classList.add('d-none');
     button.querySelector('.contact-submit-loading').classList.remove('d-none');
@@ -270,7 +272,8 @@
           message: form.elements.message.value.trim()
         })
       });
-      const result = await response.json();
+      let result = {};
+      try { result = await response.json(); } catch (_) {}
       if (!response.ok || !result.success) {
         throw new Error(result.message || 'Unable to send your message right now. Please try again later.');
       }
@@ -286,6 +289,7 @@
         status.textContent = error.message || 'Unable to send your message right now. Please try again later.';
       }
     } finally {
+      contactSending = false;
       button.disabled = false;
       button.querySelector('.contact-submit-label').classList.remove('d-none');
       button.querySelector('.contact-submit-loading').classList.add('d-none');
