@@ -118,7 +118,7 @@ def send_brevo_email(to_email, subject, html_content, text_content=None, reply_t
         app.logger.error("Brevo email not sent: requests dependency is unavailable.")
         return False
 
-    api_key = os.environ.get("BREVO_API_KEY")
+    api_key = (os.environ.get("BREVO_API_KEY") or "").strip().strip('"').strip("'").strip()
     sender_email = os.environ.get("BREVO_SENDER_EMAIL")
     sender_name = os.environ.get("BREVO_SENDER_NAME")
     required_variables = {
@@ -182,11 +182,19 @@ def send_brevo_email(to_email, subject, html_content, text_content=None, reply_t
             403: "permission/sender or IP not allowed",
             429: "rate limited",
         }
+        if api_key.startswith("xkeysib-"):
+            key_type = "v3 API key format"
+        elif api_key.startswith("xsmtpsib-"):
+            key_type = "SMTP key (wrong type, need API key)"
+        else:
+            key_type = "unrecognised format"
         app.logger.error(
-            "Brevo request failed: status=%s brevo_message=%s brevo_code=%s reason=%s",
+            "Brevo request failed: status=%s brevo_message=%s brevo_code=%s key_type=%s key_length=%s reason=%s",
             status_code,
             brevo_message,
             brevo_code,
+            key_type,
+            len(api_key),
             reasons.get(status_code, "Brevo server error" if status_code >= 500 else "unexpected response"),
         )
         return False
