@@ -405,11 +405,19 @@ def save_qr_scan(user_id, qr_content, result, risk_score):
     )
 
 
+def _column_names_from_cursor(cursor):
+    rows = cursor.fetchall()
+    return {
+        row["Field"] if isinstance(row, dict) else row[0]
+        for row in rows
+    }
+
+
 def _scan_table_columns(cursor, table_name):
     if table_name not in {"email_scans", "file_scans"}:
         raise ValueError("Unsupported scanner table")
     cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
-    return {row[0] for row in cursor.fetchall()}
+    return _column_names_from_cursor(cursor)
 
 
 def _save_extended_scan(table_name, fields):
@@ -491,7 +499,7 @@ def _history_select(cursor, table_name, scan_type, value_candidates):
         columns = _scan_table_columns(cursor, table_name)
     else:
         cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
-        columns = {row[0] for row in cursor.fetchall()}
+        columns = _column_names_from_cursor(cursor)
 
     required = {"user_id", "result", "risk_score", "created_at"}
     if not required.issubset(columns):
