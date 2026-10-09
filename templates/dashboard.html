@@ -197,10 +197,10 @@
         {% for scan in recent %}
         <div class="activity-row">
           <div class="d-flex align-items-center">
-            <span class="activity-icon"><i class="bi {% if scan.scan_type == 'SMS Scan' %}bi-chat-dots{% elif scan.scan_type == 'Link Check' %}bi-link-45deg{% else %}bi-qr-code-scan{% endif %}"></i></span>
+            <span class="activity-icon"><i class="bi {% if scan.scan_type == 'SMS Scan' %}bi-chat-dots{% elif scan.scan_type == 'Link Check' %}bi-link-45deg{% elif scan.scan_type == 'Email Scan' %}bi-envelope-paper{% elif scan.scan_type == 'File Scan' %}bi-file-earmark-check{% else %}bi-qr-code-scan{% endif %}"></i></span>
             <div>
               <div class="fw-semibold" style="font-size:0.92rem;">{{ scan.scan_type }}</div>
-              <div class="text-muted-soft" style="font-size:0.78rem;">{{ scan.created_at }}</div>
+              <div class="text-muted-soft" style="font-size:0.78rem;">{{ scan.input_value or 'No subject or filename' }} · Risk {{ scan.risk_score }}% · {{ scan.created_at }}</div>
             </div>
           </div>
           <span class="status-badge {% if scan.risk_score >= 70 %}danger{% elif scan.risk_score >= 40 %}suspicious{% else %}safe{% endif %}"><i class="bi {% if scan.risk_score >= 40 %}bi-exclamation-triangle{% else %}bi-check-circle{% endif %}"></i>{{ scan.result }}</span>

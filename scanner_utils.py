@@ -135,6 +135,9 @@ def analyze_email_text(content, source="paste"):
     level, css_class = _risk_level(score)
     if not issues:
         issues = ["No strong phishing or fraud indicators detected"]
+    parsed_headers = BytesParser(policy=policy.default).parsebytes(
+        text.encode("utf-8", errors="replace")
+    )
     return {
         "success": True,
         "status": level,
@@ -142,6 +145,11 @@ def analyze_email_text(content, source="paste"):
         "risk_score": score,
         "indicators": list(dict.fromkeys(issues)),
         "suspicious_urls": list(dict.fromkeys(detected_urls)),
+        "email_metadata": {
+            "sender": _first_header(parsed_headers, "From"),
+            "reply_to": _first_header(parsed_headers, "Reply-To"),
+            "subject": _first_header(parsed_headers, "Subject"),
+        },
         "source": source,
         "recommendation": (
             "Review the sender and links carefully, and do not provide credentials or payment details."

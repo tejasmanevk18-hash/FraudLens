@@ -32,6 +32,7 @@ from flask import (
     session, jsonify, send_file, flash, render_template_string
 )
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 # MySQL database module
 from db import (
@@ -1110,6 +1111,8 @@ def api_scan_email():
     if not content:
         return jsonify(success=False, message="Please enter email content to analyze."), 400
     result = scanner_utils.analyze_email_text(content, source="paste")
+    if not result.get("success"):
+        return jsonify(result), 400
     metadata = result.get("email_metadata", {})
     saved = save_email_scan(
         session["user_id"],
@@ -1121,8 +1124,10 @@ def api_scan_email():
         result.get("indicators", []),
         result.get("suspicious_urls", []),
     )
+    result["history_saved"] = saved
     if not saved:
         app.logger.warning("Email scan completed but history could not be saved.")
+        result["history_message"] = "Analysis completed, but scan history could not be saved. Please try again later."
     return jsonify(result)
 
 
@@ -1131,19 +1136,6 @@ def api_scan_email():
 def api_upload_eml():
     import scanner_utils
 
-    metadata = result.get("email_metadata", {})
-    saved = save_email_scan(
-        session["user_id"],
-        metadata.get("sender", ""),
-        metadata.get("reply_to", ""),
-        metadata.get("subject", ""),
-        result.get("status", "Safe"),
-        result.get("risk_score", 0),
-        result.get("indicators", []),
-        result.get("suspicious_urls", []),
-    )
-    if not saved:
-        app.logger.warning("EML scan completed but history could not be saved.")
     file = request.files.get("email_file")
     if not file or not file.filename:
         return jsonify(success=False, message="Please select a .eml file to upload."), 400
@@ -1157,6 +1149,21 @@ def api_upload_eml():
     result = scanner_utils.analyze_eml_file(file_bytes, filename)
     if not result["success"]:
         return jsonify(result), 400
+    metadata = result.get("email_metadata", {})
+    saved = save_email_scan(
+        session["user_id"],
+        metadata.get("sender", ""),
+        metadata.get("reply_to", ""),
+        metadata.get("subject", ""),
+        result.get("status", "Safe"),
+        result.get("risk_score", 0),
+        result.get("indicators", []),
+        result.get("suspicious_urls", []),
+    )
+    result["history_saved"] = saved
+    if not saved:
+        app.logger.warning("EML scan completed but history could not be saved.")
+        result["history_message"] = "Analysis completed, but scan history could not be saved. Please try again later."
     return jsonify(result)
 
 
@@ -1180,9 +1187,10 @@ def api_scan_file():
     )
     if not result["success"]:
         return jsonify(result), 400
+    safe_filename = secure_filename(file.filename.replace("\\", "/").rsplit("/", 1)[-1])[:255]
     saved = save_file_scan(
         session["user_id"],
-        result.get("file_name", file.filename.strip()),
+        safe_filename or "uploaded-file",
         result.get("file_type", "UNKNOWN"),
         result.get("file_size", len(file_bytes)),
         result.get("status", "Safe"),
@@ -1190,8 +1198,10 @@ def api_scan_file():
         result.get("indicators", []),
         result.get("suspicious_urls", []),
     )
+    result["history_saved"] = saved
     if not saved:
         app.logger.warning("File scan completed but history could not be saved.")
+        result["history_message"] = "Analysis completed, but scan history could not be saved. Please try again later."
     return jsonify(result)
 
 

@@ -1,7 +1,7 @@
 """
 db.py — MySQL connection and helper functions for FraudLens.
 
-Connects to the MySQL database 'fraudlens_new' used by the app.
+Connects to the MySQL database selected by the DB_* environment variables.
 All database operations are centralized here for maintainability.
 """
 
@@ -27,7 +27,7 @@ DB_CONFIG = {
     "host": os.environ.get("DB_HOST") or os.environ.get("MYSQL_HOST", "127.0.0.1"),
     "user": os.environ.get("DB_USER") or os.environ.get("MYSQL_USER", "root"),
     "password": os.environ.get("DB_PASSWORD") or os.environ.get("MYSQL_PASSWORD", "Fraudlens@123"),
-    "database": os.environ.get("DB_NAME") or os.environ.get("MYSQL_DATABASE", "fraudlens_new"),
+    "database": os.environ.get("DB_NAME") or os.environ.get("MYSQL_DATABASE", "default_db"),
     "port": int(os.environ.get("DB_PORT") or os.environ.get("MYSQL_PORT", "3306")),
 }
 
@@ -405,38 +405,110 @@ def save_qr_scan(user_id, qr_content, result, risk_score):
     )
 
 
+def _scan_table_columns(cursor, table_name):
+    if table_name not in {"email_scans", "file_scans"}:
+        raise ValueError("Unsupported scanner table")
+    cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+    return {row[0] for row in cursor.fetchall()}
+
+
+def _save_extended_scan(table_name, fields):
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        columns = _scan_table_columns(cursor, table_name)
+        insert_columns = []
+        values = []
+        missing_required = []
+        for candidates, value, required, label in fields:
+            column = next((candidate for candidate in candidates if candidate in columns), None)
+            if column is None:
+                if required:
+                    missing_required.append(label)
+                continue
+            insert_columns.append(f"`{column}`")
+            values.append(value)
+
+        if missing_required:
+            print(
+                f"Database schema mismatch while saving {table_name}: "
+                f"missing required columns for {', '.join(missing_required)}"
+            )
+            return False
+
+        placeholders = ", ".join(["%s"] * len(values))
+        sql = (
+            f"INSERT INTO `{table_name}` ({', '.join(insert_columns)}) "
+            f"VALUES ({placeholders})"
+        )
+        cursor.execute(sql, tuple(values))
+        conn.commit()
+        return True
+    except MySQLError as e:
+        if conn:
+            conn.rollback()
+        print(f"Database error while saving {table_name}: {e}")
+        return False
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()
+
+
 def save_email_scan(user_id, sender, reply_to, subject, result, risk_score,
                      indicators, suspicious_urls):
-    return _insert_scan(
-        """
-        INSERT INTO email_scans
-            (user_id, sender, reply_to, subject, result, risk_score,
-             indicators, suspicious_urls)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            user_id, sender, reply_to, subject, result, risk_score,
-            json.dumps(indicators or []),
-            json.dumps(suspicious_urls or []),
-        )
-    )
+    return _save_extended_scan("email_scans", [
+        (("user_id",), user_id, True, "user_id"),
+        (("sender_email", "sender"), sender, False, "sender"),
+        (("reply_to",), reply_to, False, "reply_to"),
+        (("email_subject", "subject"), subject, False, "subject"),
+        (("result",), result, True, "result"),
+        (("risk_score",), risk_score, True, "risk_score"),
+        (("scan_reasons", "indicators"), json.dumps(indicators or []), False, "scan_reasons"),
+        (("suspicious_urls",), json.dumps(suspicious_urls or []), False, "suspicious_urls"),
+    ])
 
 
 def save_file_scan(user_id, original_filename, file_type, file_size, result,
                    risk_score, indicators, suspicious_urls):
-    return _insert_scan(
-        """
-        INSERT INTO file_scans
-            (user_id, original_filename, file_type, file_size, result,
-             risk_score, indicators, suspicious_urls)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            user_id, original_filename, file_type, file_size, result,
-            risk_score,
-            json.dumps(indicators or []),
-            json.dumps(suspicious_urls or []),
-        )
+    return _save_extended_scan("file_scans", [
+        (("user_id",), user_id, True, "user_id"),
+        (("filename", "original_filename"), original_filename, True, "filename"),
+        (("file_type",), file_type, True, "file_type"),
+        (("file_size",), file_size, True, "file_size"),
+        (("result",), result, True, "result"),
+        (("risk_score",), risk_score, True, "risk_score"),
+        (("scan_reasons", "indicators"), json.dumps(indicators or []), False, "scan_reasons"),
+        (("suspicious_urls",), json.dumps(suspicious_urls or []), False, "suspicious_urls"),
+    ])
+
+
+def _history_select(cursor, table_name, scan_type, value_candidates):
+    if table_name in {"email_scans", "file_scans"}:
+        columns = _scan_table_columns(cursor, table_name)
+    else:
+        cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+        columns = {row[0] for row in cursor.fetchall()}
+
+    required = {"user_id", "result", "risk_score", "created_at"}
+    if not required.issubset(columns):
+        raise ValueError(f"{table_name} is missing required history columns")
+    value_columns = [
+        next((candidate for candidate in candidates if candidate in columns), None)
+        for candidates in value_candidates
+    ]
+    value_columns = [column for column in value_columns if column]
+    if not value_columns:
+        raise ValueError(f"{table_name} has no supported history label column")
+    label_expression = "CONCAT_WS(' - ', " + ", ".join(
+        f"NULLIF(CAST(`{column}` AS CHAR), '')" for column in value_columns
+    ) + ")"
+    return (
+        f"SELECT %s AS scan_type, {label_expression} AS input_value, "
+        f"result, risk_score, created_at FROM `{table_name}` WHERE user_id = %s"
     )
 
 
@@ -447,24 +519,30 @@ def get_scan_history(user_id, limit=10):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute(
-            """
-            SELECT scan_type, input_value, result, risk_score, created_at
-            FROM (
-                SELECT 'SMS Scan' AS scan_type, message AS input_value, result, risk_score, created_at
-                FROM sms_scans WHERE user_id = %s
-                UNION ALL
-                SELECT 'Link Check', url, result, risk_score, created_at
-                FROM link_scans WHERE user_id = %s
-                UNION ALL
-                SELECT 'QR Scan', qr_content, result, risk_score, created_at
-                FROM qr_scans WHERE user_id = %s
-            ) AS scan_history
-            ORDER BY created_at DESC
-            LIMIT %s
-            """,
-            (user_id, user_id, user_id, limit)
+        scan_tables = [
+            ("sms_scans", "SMS Scan", [("message",)]),
+            ("link_scans", "Link Check", [("url",)]),
+            ("qr_scans", "QR Scan", [("qr_content",)]),
+            ("email_scans", "Email Scan", [("email_subject", "subject"), ("sender_email", "sender")]),
+            ("file_scans", "File Scan", [("filename", "original_filename"), ("file_type",)]),
+        ]
+        fragments = []
+        parameters = []
+        for table_name, scan_type, value_candidates in scan_tables:
+            try:
+                fragments.append(_history_select(cursor, table_name, scan_type, value_candidates))
+            except (MySQLError, ValueError) as e:
+                print(f"Database warning: omitting {table_name} from scan history: {e}")
+                continue
+            parameters.extend((scan_type, user_id))
+        if not fragments:
+            return []
+        query = (
+            "SELECT scan_type, input_value, result, risk_score, created_at FROM ("
+            + " UNION ALL ".join(fragments)
+            + ") AS scan_history ORDER BY created_at DESC LIMIT %s"
         )
+        cursor.execute(query, (*parameters, limit))
         return cursor.fetchall() or []
     except MySQLError as e:
         print(f"Database error while reading scan history: {e}")
@@ -495,9 +573,13 @@ def get_scan_stats(user_id):
                 SELECT risk_score FROM link_scans WHERE user_id = %s
                 UNION ALL
                 SELECT risk_score FROM qr_scans WHERE user_id = %s
+                UNION ALL
+                SELECT risk_score FROM email_scans WHERE user_id = %s
+                UNION ALL
+                SELECT risk_score FROM file_scans WHERE user_id = %s
             ) AS user_scans
             """,
-            (user_id, user_id, user_id)
+            (user_id, user_id, user_id, user_id, user_id)
         )
         row = cursor.fetchone() or {}
         total = int(row.get("total") or 0)

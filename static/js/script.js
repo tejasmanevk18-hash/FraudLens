@@ -975,12 +975,16 @@
     const score = Number(data.risk_score ?? data.score ?? 0);
     const flags = data.indicators || data.flags || [];
     const metadataHtml = metadata.map(([label, value]) => `<div class="scanner-file-meta"><i class="bi bi-info-circle"></i><span><strong>${escapeHTML(label)}:</strong> ${escapeHTML(value)}</span></div>`).join('');
+    const historyWarning = data.history_saved === false
+      ? `<div class="alert alert-warning mt-3 mb-0" role="status">${escapeHTML(data.history_message || 'Analysis completed, but scan history could not be saved.')}</div>`
+      : '';
     resultCard.classList.remove('hidden-result');
     resultCard.innerHTML = `
       <div class="result-header"><h4>${escapeHTML(title)}</h4><div class="result-badge ${cls}">${escapeHTML(level)}</div></div>
       <div class="result-body mt-3">
         <div class="d-flex flex-wrap gap-2"><span class="indicator-chip"><i class="bi bi-shield-lock me-1"></i>Risk ${Math.round(score)}%</span><span class="indicator-chip"><i class="bi bi-clock me-1"></i>Scanned ${new Date().toLocaleString()}</span></div>
         ${metadataHtml}${extra}
+        ${historyWarning}
         <p class="mt-3">${escapeHTML(data.recommendation || 'Review the results before taking any action.')}</p>
         <div class="mt-3"><strong>Detected issues:</strong><ul class="mb-0">${(flags || []).map(f => `<li>${escapeHTML(f)}</li>`).join('')}</ul></div>
       </div>`;
