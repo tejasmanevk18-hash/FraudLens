@@ -213,19 +213,61 @@ def send_welcome_email(user_name, user_email):
     if not user_email:
         return False
     subject = "Welcome to FraudLens"
-    html = f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6; background: #f8fafc; padding: 24px;">
-        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 28px;">
-          <h2 style="margin-top: 0; color: #0f172a;">Welcome to FraudLens, {user_name}!</h2>
-          <p>Your FraudLens account was successfully created.</p>
-          <p>You can now use FraudLens to check suspicious messages, links, and QR codes with confidence.</p>
-          <p style="margin-top: 20px; color: #475569;">FraudLens - AI Powered Scam Detection System 2026</p>
-        </div>
-      </body>
+    display_name = html.escape(user_name or "there", quote=True)
+    app_url = "https://fraudlens-5wb0.onrender.com/"
+    html_content = f"""
+        <!doctype html>
+        <html lang="en">
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+                <title>Welcome to FraudLens</title>
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #f3f6f8; color: #24313b; font-family: Arial, Helvetica, sans-serif; line-height: 1.6;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f3f6f8;">
+                    <tr>
+                        <td align="center" style="padding: 32px 16px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e1e8ec;">
+                                <tr>
+                                    <td style="padding: 22px 32px; background-color: #123b46; color: #ffffff; font-size: 20px; font-weight: bold;">FraudLens</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 32px; font-size: 16px;">
+                                        <h1 style="margin: 0 0 20px; color: #173b45; font-size: 25px; line-height: 1.3;">Welcome to FraudLens, {display_name}!</h1>
+                                        <p style="margin: 0 0 16px;">Your FraudLens account was successfully created.</p>
+                                        <p style="margin: 0 0 24px;">You can now use FraudLens to check suspicious messages, links, and QR codes with confidence.</p>
+                                        <p style="margin: 0 0 8px; color: #173b45; font-size: 18px; font-weight: bold;">Explore FraudLens</p>
+                                        <p style="margin: 0 0 20px;">You can now visit FraudLens to explore the application and its features.</p>
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 24px;">
+                                            <tr>
+                                                <td align="center" bgcolor="#167c80" style="border-radius: 4px;">
+                                                    <a href="{app_url}" target="_blank" style="display: inline-block; padding: 12px 22px; color: #ffffff; font-size: 16px; font-weight: bold; text-decoration: none;">Open FraudLens</a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <p style="margin: 0 0 24px; font-size: 14px;">Or open: <a href="{app_url}" style="color: #126b72; word-break: break-all;">{app_url}</a></p>
+                                        <p style="margin: 0 0 24px; color: #64727a; font-size: 13px;">FraudLens - AI Powered Scam Detection System 2026</p>
+                                        <p style="margin: 0;">Regards,<br>FraudLens</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </body>
     </html>
     """
-    return send_brevo_email(user_email, subject, html, text_content=f"Welcome to FraudLens, {user_name}! Your account was successfully created.")
+    text_content = (
+        f"Welcome to FraudLens, {user_name or 'there'}!\n\n"
+        "Your FraudLens account was successfully created.\n\n"
+        "You can now use FraudLens to check suspicious messages, links, and QR codes with confidence.\n\n"
+        "Explore FraudLens\n"
+        "You can now visit FraudLens to explore the application and its features.\n\n"
+        f"Visit FraudLens: {app_url}\n\n"
+        "FraudLens - AI Powered Scam Detection System 2026\n\n"
+        "Regards,\nFraudLens"
+    )
+    return send_brevo_email(user_email, subject, html_content, text_content=text_content)
 
 
 def send_password_reset_email(user_name, user_email, raw_token):

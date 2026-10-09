@@ -24,11 +24,11 @@ class DatabaseUnavailableError(MySQLError):
 # explicit DB_* variables used by the deployment configuration, while
 # retaining MYSQL_* compatibility for existing local environments.
 DB_CONFIG = {
-    "host": os.environ.get("DB_HOST") or os.environ.get("MYSQL_HOST", "127.0.0.1"),
-    "user": os.environ.get("DB_USER") or os.environ.get("MYSQL_USER", "root"),
-    "password": os.environ.get("DB_PASSWORD") or os.environ.get("MYSQL_PASSWORD", "Fraudlens@123"),
-    "database": os.environ.get("DB_NAME") or os.environ.get("MYSQL_DATABASE", "default_db"),
-    "port": int(os.environ.get("DB_PORT") or os.environ.get("MYSQL_PORT", "3306")),
+    "host": os.environ.get("DB_HOST") or os.environ.get("MYSQL_HOST", "mysql-4350779-fraudlens.f.aivencloud.com"),
+    "user": os.environ.get("DB_USER") or os.environ.get("MYSQL_USER", ""),
+    "password": os.environ.get("DB_PASSWORD") or os.environ.get("MYSQL_PASSWORD", ""),
+    "database": os.environ.get("DB_NAME") or os.environ.get("MYSQL_DATABASE", "defaultdb"),
+    "port": int(os.environ.get("DB_PORT") or os.environ.get("MYSQL_PORT", "20023")),
 }
 
 # Keep all server-side account operations on the selected central database.
@@ -569,25 +569,36 @@ def get_scan_stats(user_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
+        scan_tables = ("sms_scans", "link_scans", "qr_scans", "email_scans", "file_scans")
+        fragments = []
+        parameters = []
+        for table_name in scan_tables:
+            try:
+                if table_name in {"email_scans", "file_scans"}:
+                    columns = _scan_table_columns(cursor, table_name)
+                else:
+                    cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+                    columns = _column_names_from_cursor(cursor)
+                if not {"user_id", "risk_score"}.issubset(columns):
+                    print(f"Database warning: omitting {table_name} from scan stats: required columns are missing")
+                    continue
+            except MySQLError as e:
+                print(f"Database warning: omitting {table_name} from scan stats: {e}")
+                continue
+            fragments.append(f"SELECT risk_score FROM `{table_name}` WHERE user_id = %s")
+            parameters.append(user_id)
+
+        if not fragments:
+            return {"total": 0, "threats": 0, "safe": 0, "average_risk": 0, "risk_level": "No data"}
+
         cursor.execute(
-            """
-            SELECT COUNT(*) AS total,
-                   COALESCE(SUM(CASE WHEN risk_score >= 40 THEN 1 ELSE 0 END), 0) AS threats,
-                   COALESCE(SUM(CASE WHEN risk_score < 40 THEN 1 ELSE 0 END), 0) AS safe,
-                   COALESCE(AVG(risk_score), 0) AS average_risk
-            FROM (
-                SELECT risk_score FROM sms_scans WHERE user_id = %s
-                UNION ALL
-                SELECT risk_score FROM link_scans WHERE user_id = %s
-                UNION ALL
-                SELECT risk_score FROM qr_scans WHERE user_id = %s
-                UNION ALL
-                SELECT risk_score FROM email_scans WHERE user_id = %s
-                UNION ALL
-                SELECT risk_score FROM file_scans WHERE user_id = %s
-            ) AS user_scans
-            """,
-            (user_id, user_id, user_id, user_id, user_id)
+            "SELECT COUNT(*) AS total, "
+            "COALESCE(SUM(CASE WHEN risk_score >= 40 THEN 1 ELSE 0 END), 0) AS threats, "
+            "COALESCE(SUM(CASE WHEN risk_score < 40 THEN 1 ELSE 0 END), 0) AS safe, "
+            "COALESCE(AVG(risk_score), 0) AS average_risk FROM ("
+            + " UNION ALL ".join(fragments)
+            + ") AS user_scans",
+            tuple(parameters),
         )
         row = cursor.fetchone() or {}
         total = int(row.get("total") or 0)
