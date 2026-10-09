@@ -683,19 +683,26 @@ def forgot_password():
         ), 503
 
     if user:
+        email_sent = False
         try:
             raw_token = secrets.token_urlsafe(32)
             expires_at = datetime.utcnow() + timedelta(minutes=30)
             if not create_password_reset_token(user["id"], raw_token, expires_at.strftime("%Y-%m-%d %H:%M:%S")):
                 app.logger.warning("Password reset token could not be stored for user_id=%s", user["id"])
             else:
-                send_password_reset_email(user.get("full_name"), user.get("email"), raw_token)
+                email_sent = send_password_reset_email(user.get("full_name"), user.get("email"), raw_token)
         except Exception as exc:  # pragma: no cover
             app.logger.warning("Password reset email processing failed for %s: %s", email, exc)
 
+        if email_sent:
+            return render_template_string(
+                FORGOT_PASSWORD_TEMPLATE,
+                message="If an account exists for this email, a password reset link has been sent."
+            )
+
     return render_template_string(
         FORGOT_PASSWORD_TEMPLATE,
-        message="If an account exists for this email, a password reset link has been sent."
+        error="We couldn't send a reset link right now. Please try again later."
     )
 
 
