@@ -8,3 +8,4 @@ pyzbar
 mysql-connector-python
 requests
 gunicorn
+python-dotenv
