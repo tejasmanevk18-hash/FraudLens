@@ -12,6 +12,10 @@ import traceback
 
 import mysql.connector
 from mysql.connector import Error as MySQLError
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 class DatabaseUnavailableError(MySQLError):

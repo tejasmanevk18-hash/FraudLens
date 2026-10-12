@@ -1,0 +1,25 @@
+{
+  "name": "FraudLens - AI Powered Scam Detection System",
+  "short_name": "FraudLens",
+  "description": "FraudLens helps users analyze suspicious links, SMS messages, QR codes, emails, and files safely.",
+  "start_url": "https://fraudlens-5wb0.onrender.com/",
+  "scope": "https://fraudlens-5wb0.onrender.com/",
+  "display": "standalone",
+  "background_color": "#0b1f2a",
+  "theme_color": "#123b46",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/static/images/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/images/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

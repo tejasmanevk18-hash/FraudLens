@@ -969,9 +969,16 @@
     `;
   }
 
+  function getStatusClass(status) {
+    const level = String(status || '').toLowerCase();
+    if (level.includes('no known threats') || level.includes('safe')) return 'safe';
+    if (level.includes('suspicious')) return 'medium';
+    return 'high';
+  }
+
   function renderScannerResult(data, resultCard, { title, metadata = [], extra = '' } = {}) {
     const level = data.status || data.level || 'Unknown';
-    const cls = level.toLowerCase().includes('safe') ? 'safe' : level.toLowerCase().includes('suspicious') ? 'medium' : 'high';
+    const cls = getStatusClass(level);
     const score = Number(data.risk_score ?? data.score ?? 0);
     const flags = data.indicators || data.flags || [];
     const metadataHtml = metadata.map(([label, value]) => `<div class="scanner-file-meta"><i class="bi bi-info-circle"></i><span><strong>${escapeHTML(label)}:</strong> ${escapeHTML(value)}</span></div>`).join('');
@@ -1070,23 +1077,164 @@
 
   function initFileScanner() {
     const input = document.getElementById('fileInput');
+    const folderInput = document.getElementById('folderInput');
     const scanBtn = document.getElementById('scanFileBtn');
+    const scanFolderBtn = document.getElementById('scanFolderBtn');
     if (!input || !scanBtn) return;
     const dropZone = document.getElementById('fileDropZone');
     const selectedName = document.getElementById('fileSelectedName');
     const loading = document.getElementById('fileLoading');
     const resultCard = document.getElementById('fileResult');
+    const folderProgress = document.getElementById('folderProgress');
+    const folderProgressBar = document.getElementById('folderProgressBar');
+    const folderProgressText = document.getElementById('folderProgressText');
+    const folderSummary = document.getElementById('folderSummary');
+    const folderResultList = document.getElementById('folderResultList');
+    const cancelBtn = document.getElementById('cancelFolderScanBtn');
+    const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
     let selectedFile = null;
     let analysisInProgress = false;
-    setupDropZone(dropZone, input, file => {
+    let folderScanCancelled = false;
+    let folderAbortController = null;
+
+    function clearFolderResults() {
+      if (folderSummary) folderSummary.textContent = '';
+      if (folderResultList) folderResultList.innerHTML = '';
+      if (folderProgress) folderProgress.classList.add('hidden-result');
+      if (folderProgressBar) folderProgressBar.style.width = '0%';
+      if (folderProgressText) folderProgressText.textContent = 'No folder selected.';
+    }
+
+    function updateFolderSummary(summary) {
+      if (folderSummary) folderSummary.innerHTML = summary;
+    }
+
+    function appendFolderResult(item) {
+      if (!folderResultList) return;
+      const li = document.createElement('li');
+      li.className = 'folder-result-item';
+      li.innerHTML = `
+        <div class="folder-file-path">${escapeHTML(item.path || item.name)}</div>
+        <div class="folder-file-meta">
+          <span>${escapeHTML(item.name)}</span>
+          <span>${escapeHTML(item.extension || 'unknown')}</span>
+          <span class="folder-status ${item.statusClass || 'neutral'}">${escapeHTML(item.status || 'Unknown')}</span>
+        </div>
+        ${item.message ? `<div class="folder-file-message">${escapeHTML(item.message)}</div>` : ''}
+      `;
+      folderResultList.appendChild(li);
+    }
+
+    function handleSelectedFile(file) {
+      if (!file) return;
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        showToast('This file exceeds the 15 MB per-file limit. Please choose a smaller file.', 'error');
+        return;
+      }
       selectedFile = file;
       selectedName.textContent = `${file.name} · ${(file.size / 1024).toFixed(1)} KB`;
       dropZone.classList.add('has-file');
       scanBtn.disabled = false;
+    }
+
+    setupDropZone(dropZone, input, handleSelectedFile);
+
+    scanFolderBtn?.addEventListener('click', () => {
+      folderInput?.click();
     });
-    document.getElementById('clearFileBtn')?.addEventListener('click', () => { selectedFile = null; input.value = ''; selectedName.textContent = ''; dropZone.classList.remove('has-file'); scanBtn.disabled = true; resultCard.classList.add('hidden-result'); });
+
+    folderInput?.addEventListener('change', async () => {
+      const files = Array.from(folderInput.files || []);
+      if (!files.length) return;
+      clearFolderResults();
+      const deduped = [];
+      const seen = new Set();
+      files.forEach(file => {
+        const key = (file.webkitRelativePath || file.name || '') + ':' + file.size + ':' + file.lastModified;
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push({ file, path: file.webkitRelativePath || file.name });
+        }
+      });
+      folderScanCancelled = false;
+      if (folderProgress) folderProgress.classList.remove('hidden-result');
+      if (folderProgressText) folderProgressText.textContent = `Scanning ${deduped.length} discovered files…`;
+      let processed = 0;
+      let suspicious = 0;
+      let safe = 0;
+      let unsupported = 0;
+      let failed = 0;
+      let skipped = 0;
+      if (folderResultList) folderResultList.innerHTML = '';
+
+      for (const entry of deduped) {
+        if (folderScanCancelled) break;
+        const file = entry.file;
+        const relativePath = entry.path || file.name;
+        const fileExtension = (file.name.split('.').pop() || 'unknown').toLowerCase();
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          skipped += 1;
+          appendFolderResult({ path: relativePath, name: file.name, extension: fileExtension, status: 'Skipped', statusClass: 'neutral', message: 'Exceeded the 15 MB per-file limit.' });
+          processed += 1;
+          continue;
+        }
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+        const controller = new AbortController();
+        folderAbortController = controller;
+        try {
+          if (folderProgressText) folderProgressText.textContent = `Processing ${processed + 1}/${deduped.length}: ${relativePath}`;
+          const response = await fetch('/api/scan-file', { method: 'POST', credentials: 'same-origin', body: formData, signal: controller.signal });
+          const data = await response.json().catch(() => ({}));
+          const status = data.status || 'Scan Failed';
+          const normalizedStatus = String(status);
+          if (response.ok && data.success) {
+            if (status === 'Suspicious') suspicious += 1;
+            else if (status === 'No Known Threats Detected') safe += 1;
+            else if (status === 'Unsupported Format') unsupported += 1;
+            else if (status === 'Scan Failed' || status === 'Skipped' || status === 'Unable to Fully Scan') failed += 1;
+            appendFolderResult({ path: relativePath, name: file.name, extension: fileExtension, status: normalizedStatus, statusClass: normalizedStatus === 'No Known Threats Detected' ? 'safe' : normalizedStatus === 'Suspicious' ? 'warning' : 'neutral', message: data.recommendation || data.message || 'Scan completed.' });
+          } else {
+            failed += 1;
+            appendFolderResult({ path: relativePath, name: file.name, extension: fileExtension, status: 'Scan Failed', statusClass: 'neutral', message: data.message || 'The scan could not complete.' });
+          }
+        } catch (error) {
+          if (error?.name === 'AbortError') {
+            appendFolderResult({ path: relativePath, name: file.name, extension: fileExtension, status: 'Skipped', statusClass: 'neutral', message: 'Folder scan cancelled by the user.' });
+            break;
+          }
+          failed += 1;
+          appendFolderResult({ path: relativePath, name: file.name, extension: fileExtension, status: 'Scan Failed', statusClass: 'neutral', message: 'The server could not finish this file scan.' });
+        } finally {
+          processed += 1;
+          const percent = deduped.length ? ((processed / deduped.length) * 100) : 0;
+          if (folderProgressBar) folderProgressBar.style.width = `${Math.min(percent, 100)}%`;
+          if (folderScanCancelled) {
+            if (folderProgressText) folderProgressText.textContent = `Scan incomplete: ${processed}/${deduped.length} files processed.`;
+            updateFolderSummary(`<strong>Incomplete scan.</strong> Processed: ${processed} / ${deduped.length} · Suspicious: ${suspicious} · No known threats: ${safe} · Unsupported: ${unsupported} · Failed: ${failed} · Skipped: ${skipped}`);
+            break;
+          }
+          if (processed >= deduped.length) {
+            if (folderProgressText) folderProgressText.textContent = `Folder scan complete: ${processed}/${deduped.length} files processed.`;
+            updateFolderSummary(`<strong>Summary:</strong> Discovered: ${deduped.length} · Scanned: ${processed} · Suspicious: ${suspicious} · No known threats: ${safe} · Unsupported: ${unsupported} · Failed: ${failed} · Skipped: ${skipped}`);
+          }
+        }
+      }
+      folderInput.value = '';
+      if (cancelBtn) cancelBtn.addEventListener('click', () => {
+        folderScanCancelled = true;
+        folderAbortController?.abort();
+        if (folderProgressText) folderProgressText.textContent = `Scan cancelled: ${processed}/${deduped.length} files processed.`;
+      }, { once: true });
+    });
+
+    document.getElementById('clearFileBtn')?.addEventListener('click', () => { selectedFile = null; input.value = ''; selectedName.textContent = ''; dropZone.classList.remove('has-file'); scanBtn.disabled = true; resultCard.classList.add('hidden-result'); clearFolderResults(); folderInput.value = ''; folderScanCancelled = true; folderAbortController?.abort(); });
     scanBtn.addEventListener('click', async () => {
       if (!selectedFile || analysisInProgress) return;
+      if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
+        showToast('This file exceeds the 15 MB per-file limit. Please choose a smaller file.', 'error');
+        return;
+      }
       analysisInProgress = true;
       scanBtn.disabled = true;
       const formData = new FormData(); formData.append('file', selectedFile);

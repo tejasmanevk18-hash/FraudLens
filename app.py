@@ -19,6 +19,8 @@ import re
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
+from dotenv import load_dotenv
+load_dotenv()
 
 try:
     import requests
@@ -29,7 +31,8 @@ except ImportError:  # pragma: no cover
 # within the route handlers or helpers to avoid blocking app startup.
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    session, jsonify, send_file, flash, render_template_string
+    session, jsonify, send_file, flash, render_template_string,
+    send_from_directory
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -55,7 +58,7 @@ app = Flask(__name__)
 # for a dev/demo project, but call this out clearly.
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24).hex())
 
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB upload limit
+app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024  # 15 MB upload limit
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "model", "sms_model.pkl")
@@ -1235,7 +1238,7 @@ def api_scan_file():
         safe_filename or "uploaded-file",
         result.get("file_type", "UNKNOWN"),
         result.get("file_size", len(file_bytes)),
-        result.get("status", "Safe"),
+        result.get("status", "No Known Threats Detected"),
         result.get("risk_score", 0),
         result.get("indicators", []),
         result.get("suspicious_urls", []),
@@ -1257,7 +1260,7 @@ def not_found(e):
 
 @app.errorhandler(413)
 def too_large(e):
-    return jsonify(success=False, message="Uploaded file is too large (max 5 MB)."), 413
+    return jsonify(success=False, message="Uploaded file exceeds the 15 MB per-file limit."), 413
 
 
 @app.errorhandler(500)

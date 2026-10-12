@@ -10,10 +10,25 @@ from email.parser import BytesParser
 from urllib.parse import urlparse
 
 MAX_EMAIL_CHARS = 100_000
-MAX_FILE_BYTES = 5 * 1024 * 1024
+MAX_FILE_BYTES = 15 * 1024 * 1024
 SUPPORTED_FILE_EXTENSIONS = {
-    "pdf", "doc", "docx", "xls", "xlsx", "txt", "zip",
-    "png", "jpg", "jpeg", "gif", "webp",
+    "pdf", "doc", "docx", "docm", "dot", "dotx", "xls", "xlsx", "xlsm", "xlsb", "xlt", "ppt", "pptx",
+    "pptm", "pps", "ppsx", "odt", "ods", "odp", "rtf", "txt", "csv", "tsv", "md", "epub", "pages",
+    "numbers", "key", "exe", "msi", "msp", "dll", "sys", "drv", "ocx", "scr", "com", "cpl", "pif",
+    "appx", "msix", "appxbundle", "msixbundle", "reg", "lnk", "bat", "cmd", "ps1", "psm1", "psd1",
+    "vbs", "vbe", "js", "jse", "wsf", "wsh", "hta", "sh", "bash", "zsh", "py", "pyw", "rb", "pl",
+    "php", "html", "htm", "css", "scss", "sass", "less", "ts", "tsx", "jsx", "java", "class", "jar",
+    "war", "ear", "c", "h", "cpp", "hpp", "cs", "vb", "go", "rs", "swift", "kt", "kts", "sql", "xml",
+    "xhtml", "json", "yaml", "yml", "toml", "ini", "conf", "config", "env", "properties", "ipynb",
+    "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst", "cab", "iso", "img", "vhd", "vhdx",
+    "wim", "arj", "lzh", "lz", "lzma", "ace", "jpg", "jpeg", "png", "gif", "bmp", "webp", "tif",
+    "tiff", "svg", "ico", "heic", "heif", "avif", "raw", "cr2", "nef", "psd", "ai", "eps", "emf",
+    "wmf", "mp3", "wav", "aac", "m4a", "flac", "ogg", "opus", "wma", "aiff", "mid", "midi", "amr",
+    "mp4", "m4v", "mkv", "avi", "mov", "wmv", "flv", "webm", "mpeg", "mpg", "3gp", "ts", "vob",
+    "eml", "msg", "mbox", "pst", "ost", "ics", "vcf", "db", "sqlite", "sqlite3", "mdb", "accdb", "dbf",
+    "parquet", "avro", "orc", "feather", "pkl", "pickle", "joblib", "npy", "npz", "rds", "vdi", "vmdk",
+    "ova", "ovf", "bak", "backup", "old", "tmp", "temp", "log", "dat", "bin", "dump", "pem", "crt",
+    "cer", "p12", "pfx", "der", "torrent", "part", "download"
 }
 SUPPORTED_MIME_TYPES = {
     "application/pdf",
@@ -21,10 +36,28 @@ SUPPORTED_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.ms-excel",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-office",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.oasis.opendocument.text",
+    "application/vnd.oasis.opendocument.spreadsheet",
+    "application/vnd.oasis.opendocument.presentation",
+    "application/rtf",
     "text/plain",
+    "text/csv",
+    "application/csv",
     "application/zip",
     "application/x-zip-compressed",
-    "image/png", "image/jpeg", "image/gif", "image/webp",
+    "application/x-rar-compressed",
+    "application/x-7z-compressed",
+    "application/x-tar",
+    "application/gzip",
+    "application/x-gzip",
+    "application/octet-stream",
+    "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/tiff", "image/svg+xml",
+    "audio/mpeg", "audio/wav", "audio/x-wav", "video/mp4", "video/x-msvideo", "video/webm", "application/json",
+    "text/xml", "application/xml", "application/x-msdownload", "application/x-executable", "application/x-dosexec",
+    "application/x-msi", "application/vnd.ms-cab-compressed", "application/x-sharedlib"
 }
 
 RISKY_EMAIL_TERMS = [
@@ -250,58 +283,68 @@ def analyze_uploaded_file(filename, file_bytes, mime_type=None):
     if not filename or not file_bytes:
         return {"success": False, "message": "Please select a file to scan."}
     if len(file_bytes) > MAX_FILE_BYTES:
-        return {"success": False, "message": "File is too large (maximum 5 MB)."}
-    extension = _safe_extension(filename)
-    if extension not in SUPPORTED_FILE_EXTENSIONS:
-        return {"success": False, "message": f"Unsupported file type: {extension or 'unknown'}. Supported formats are PDF, DOC, DOCX, XLS, XLSX, TXT, ZIP, PNG, JPG, GIF and WEBP."}
+        return {"success": False, "message": "File exceeds the 15 MB per-file limit."}
 
-    detected_mime = mime_type or _mime_from_magic(file_bytes)
-    detected_mime = detected_mime.lower().split(";", 1)[0]
-    if detected_mime not in SUPPORTED_MIME_TYPES and detected_mime != "application/octet-stream":
-        return {"success": False, "message": "The file type could not be safely identified."}
+    extension = _safe_extension(filename)
+    detected_mime = (mime_type or _mime_from_magic(file_bytes) or "application/octet-stream").lower().split(";", 1)[0]
     issues = []
     score = 0
-    if extension in {"docx", "xlsx"} and detected_mime == "application/zip":
-        pass
-    elif extension in {"doc", "xls"} and detected_mime not in SUPPORTED_MIME_TYPES:
-        issues.append("File extension does not match detected type")
-        score += 10
-    elif extension in {"pdf"} and detected_mime != "application/pdf":
-        issues.append("File extension does not match detected type")
-        score += 10
-    elif extension in {"txt"} and detected_mime not in {"text/plain", "application/octet-stream"}:
-        issues.append("File extension does not match detected type")
-        score += 10
-    elif extension in {"jpg", "jpeg", "png", "gif", "webp"} and not detected_mime.startswith("image/"):
-        issues.append("File extension does not match detected type")
-        score += 10
+    unsupported = False
+    unreadable = False
+    suspicious_found = False
 
-    if len(file_bytes) > 10 * 1024 * 1024:
-        issues.append("Large file size may increase review risk")
-        score += 10
+    if extension and extension not in SUPPORTED_FILE_EXTENSIONS:
+        unsupported = True
+
+    if detected_mime not in SUPPORTED_MIME_TYPES and detected_mime != "application/octet-stream":
+        if not (detected_mime.startswith("text/") or detected_mime.startswith("image/") or detected_mime.startswith("audio/") or detected_mime.startswith("video/")):
+            unsupported = True
+
     if any(token in filename.lower() for token in ("invoice", "payment", "password", "credential", "urgent", "verify", "bank")):
         issues.append("Filename contains potentially suspicious terms")
         score += 5
+
     if file_bytes.startswith(b"MZ") or file_bytes.startswith(b"\x7fELF"):
         issues.append("Executable or binary content detected")
         score += 45
-    if extension == "zip":
-        zip_issues, text = _scan_zip(file_bytes)
-        issues.extend(zip_issues)
-        score += sum(20 if "Executable" in issue or "script" in issue.lower() else 8 for issue in zip_issues)
-    else:
-        text = ""
-        if detected_mime.startswith("text/") or extension == "txt":
+        suspicious_found = True
+
+    archive_like = extension in {
+        "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst", "cab", "iso", "img", "vhd", "vhdx",
+        "wim", "arj", "lzh", "lz", "lzma", "ace"
+    }
+
+    if archive_like and detected_mime.startswith("application/"):
+        if extension == "zip":
             try:
-                text = file_bytes.decode("utf-8", "replace")
-            except UnicodeDecodeError:
-                pass
-        elif extension in {"docx", "xlsx"} and detected_mime == "application/zip":
-            zip_issues, text = _scan_zip(file_bytes)
-            issues.extend(zip_issues)
-            score += sum(20 if "Executable" in issue or "script" in issue.lower() else 8 for issue in zip_issues)
-        elif extension == "pdf":
+                zip_issues, text = _scan_zip(file_bytes)
+                issues.extend(zip_issues)
+                score += sum(20 if "Executable" in issue or "script" in issue.lower() else 8 for issue in zip_issues)
+                suspicious_found = suspicious_found or any("script" in issue.lower() or "Executable" in issue for issue in zip_issues)
+            except Exception:
+                issues.append("Archive structure could not be read safely")
+                score += 10
+                unreadable = True
+        else:
+            issues.append("Archive-type file detected; contents were not fully extracted for review")
+            score += 10
+            unreadable = True
+
+    text = ""
+    if detected_mime.startswith("text/") or extension in {"txt", "csv", "tsv", "md", "json", "yaml", "yml", "toml", "ini", "conf", "log", "xml", "html", "htm", "js", "py", "ps1", "bat", "cmd", "sql", "java", "c", "cpp", "cs", "php", "rb", "go", "rs", "swift", "kt", "kts", "ts", "tsx", "jsx"}:
+        try:
+            text = file_bytes.decode("utf-8", "replace")
+        except UnicodeDecodeError:
+            try:
+                text = file_bytes.decode("latin-1", "replace")
+            except Exception:
+                unreadable = True
+
+    if extension == "pdf" and not text:
+        try:
             text = file_bytes.decode("latin-1", "replace")
+        except Exception:
+            unreadable = True
 
     if text:
         urls = _extract_urls(text)
@@ -310,6 +353,7 @@ def analyze_uploaded_file(filename, file_bytes, mime_type=None):
             if any(term in host for term in RISKY_URL_TERMS):
                 issues.append("Suspicious shortened URL found in file")
                 score += 25
+                suspicious_found = True
             elif host and not re.match(r"^[a-z0-9-]+\.[a-z]{2,}$", host):
                 issues.append(f"Unusual URL domain found in file: {host}")
                 score += 10
@@ -317,32 +361,51 @@ def analyze_uploaded_file(filename, file_bytes, mime_type=None):
             if marker.lower() in text.lower():
                 issues.append(f"Script-like content detected in file: {marker}")
                 score += 20
+                suspicious_found = True
                 break
         if re.search(r"\b(?:password|credential|otp|api[_-]?key|secret)\b", text, re.IGNORECASE):
             issues.append("Credential-like content detected")
             score += 10
+            suspicious_found = True
         if re.search(r"\b(?:macro|vbaProject|auto_open|openxml)\b", text, re.IGNORECASE):
             issues.append("Macro or document-code indicator detected")
             score += 15
+            suspicious_found = True
 
-    score = min(score, 100)
-    level, css_class = _risk_level(score)
+    if len(file_bytes) > 10 * 1024 * 1024:
+        issues.append("Large file size may increase review risk")
+        score += 10
+
     if not issues:
-        issues = ["No strong static security indicators detected"]
+        if unsupported:
+            status = "Unsupported Format"
+            recommendation = "This file type is not in the supported static-analysis set. Review it carefully with trusted tools or a security specialist before use."
+        elif unreadable:
+            status = "Unable to Fully Scan"
+            recommendation = "The file could not be fully analyzed in-browser. Inspect it with trusted local tools and avoid executing unknown content."
+        else:
+            status = "No Known Threats Detected"
+            recommendation = "No strong static indicators were detected. Continue to verify the file with trusted software and the sender before opening it."
+    else:
+        status = "Suspicious" if suspicious_found or score >= 40 else "No Known Threats Detected"
+        recommendation = "Do not open or execute this file from an untrusted source. Verify its origin and use trusted security tools before acting."
+
+    if unsupported and not issues:
+        score = 0
+
+    score = min(max(score, 0), 100)
     return {
         "success": True,
-        "status": level,
-        "severity": css_class,
+        "status": status,
+        "severity": "medium" if status == "Suspicious" else "safe",
         "risk_score": score,
         "file_name": filename,
-        "file_type": extension.upper() or detected_mime,
+        "file_type": extension.upper() if extension else (detected_mime or "UNKNOWN"),
         "file_size": len(file_bytes),
         "mime_type": detected_mime,
-        "indicators": list(dict.fromkeys(issues)),
-        "suspicious_urls": list(dict.fromkeys(_extract_urls(text))),
-        "recommendation": (
-            "No strong static indicators were detected. Continue to review the file with trusted software and authorities."
-            if level == "Safe"
-            else "Do not open or execute the file from untrusted sources. Verify its source and use trusted security tools."
-        ),
+        "indicators": list(dict.fromkeys(issues)) if issues else ["No strong static security indicators detected"],
+        "suspicious_urls": list(dict.fromkeys(_extract_urls(text))) if text else [],
+        "recommendation": recommendation,
+        "unsupported_format": unsupported,
+        "readability_warning": unreadable,
     }
