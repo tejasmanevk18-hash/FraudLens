@@ -1016,13 +1016,20 @@ def api_detect_sms():
     if not indicators:
         indicators = ["No strong scam indicators detected"]
 
-    saved = save_sms_scan(
-        session["user_id"], message,
-        "Scam" if prediction == "spam" else "Not Scam",
-        risk_score
-    )
-    if not saved:
-        return jsonify(success=False, message="Could not save SMS scan record."), 500
+    user_id = session.get("user_id")
+    if user_id is not None:
+        try:
+            saved = save_sms_scan(
+                user_id, message,
+                "Scam" if prediction == "spam" else "Not Scam",
+                risk_score
+            )
+            if not saved:
+                app.logger.warning("SMS scan result could not be saved to history for user_id=%s", user_id)
+        except Exception:
+            app.logger.exception("Failed to save SMS scan result for user_id=%s", user_id)
+    else:
+        app.logger.warning("SMS scan result not saved because no user_id was found in session.")
 
     return jsonify(
         success=True,
